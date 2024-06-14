@@ -169,7 +169,7 @@ packages = ["frequenz.core"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["mkdocs_macros.*", "sybil", "sybil.*"]
+module = ["mkdocs_macros.*", "sybil", "sybil.*", "async_solipsism"]
 ignore_missing_imports = true
 
 [tool.setuptools_scm]
