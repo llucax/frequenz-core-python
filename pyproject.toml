@@ -136,11 +136,15 @@ disable = [
   # it is a type-check, for which we already have mypy.
   "unsubscriptable-object",
   # Checked by flake8
+  "f-string-without-interpolation",
   "line-too-long",
+  "missing-function-docstring",
   "redefined-outer-name",
   "unnecessary-lambda-assignment",
   "unused-import",
   "unused-variable",
+  # Checked by mypy
+  "no-member",
 ]
 
 [tool.pytest.ini_options]
