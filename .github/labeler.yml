@@ -6,7 +6,6 @@
 # For more details on the configuration please see:
 # https://github.com/marketplace/actions/labeler
 
-# TODO(cookiecutter): Add different parts of the source
 # For example:
 #
 # "part:module":
@@ -32,6 +31,24 @@
 # Please have in mind that that the part:xxx labels need to
 # be created in the GitHub repository.
 
+"part:asyncio":
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/frequenz/core/asyncio.py"
+      - "src/frequenz/core/asyncio/**"
+
+"part:collections":
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/frequenz/core/collections.py"
+      - "src/frequenz/core/collections/**"
+
+"part:datetime":
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/frequenz/core/datetime.py"
+      - "src/frequenz/core/datetime/**"
+
 "part:docs":
   - changed-files:
     - any-glob-to-any-file:
@@ -39,6 +56,12 @@
       - "docs/**"
       - "examples/**"
       - LICENSE
+
+"part:math":
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/frequenz/core/math.py"
+      - "src/frequenz/core/math/**"
 
 "part:tests":
   - changed-files:
@@ -61,3 +84,9 @@
       - CODEOWNERS
       - MANIFEST.in
       - noxfile.py
+
+"part:typing":
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/frequenz/core/typing.py"
+      - "src/frequenz/core/typing/**"
