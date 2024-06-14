@@ -6,9 +6,12 @@
 
 ## Introduction
 
-Core utilities to complement Python's standard library
+Core utilities to complement Python's standard library.
 
-TODO(cookiecutter): Improve the README file
+## Documentation
+
+For information on how to use this library, please refer to the
+[documentation](https://frequenz-floss.github.io/frequenz-core-python/).
 
 ## Supported Platforms
 
