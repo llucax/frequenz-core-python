@@ -14,7 +14,19 @@ name = "frequenz-core"
 description = "Core utilities to complement Python's standard library"
 readme = "README.md"
 license = { text = "MIT" }
-keywords = ["frequenz", "python", "lib", "library", "core", "stdlib"]
+keywords = [
+  "asyncio",
+  "collections",
+  "core",
+  "datetime",
+  "frequenz",
+  "lib",
+  "library",
+  "math",
+  "python",
+  "stdlib",
+  "typing",
+]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
@@ -157,7 +169,7 @@ packages = ["frequenz.core"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["mkdocs_macros.*", "sybil", "sybil.*"]
+module = ["mkdocs_macros.*", "sybil", "sybil.*", "async_solipsism"]
 ignore_missing_imports = true
 
 [tool.setuptools_scm]
