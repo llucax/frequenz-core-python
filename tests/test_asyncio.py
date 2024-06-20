@@ -1,7 +1,8 @@
 # License: MIT
 # Copyright © 2022 Frequenz Energy-as-a-Service GmbH
 
-"""Simple test for the BaseActor."""
+"""Tests for the asyncio module."""
+
 import asyncio
 from collections.abc import Iterator
 from typing import Literal, assert_never
