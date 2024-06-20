@@ -36,18 +36,24 @@
     - any-glob-to-any-file:
       - "src/frequenz/core/asyncio.py"
       - "src/frequenz/core/asyncio/**"
+      - "tests/test_asyncio.py"
+      - "tests/asyncio/**"
 
 "part:collections":
   - changed-files:
     - any-glob-to-any-file:
       - "src/frequenz/core/collections.py"
       - "src/frequenz/core/collections/**"
+      - "tests/test_collections.py"
+      - "tests/collections/**"
 
 "part:datetime":
   - changed-files:
     - any-glob-to-any-file:
       - "src/frequenz/core/datetime.py"
       - "src/frequenz/core/datetime/**"
+      - "tests/test_datetime.py"
+      - "tests/datetime/**"
 
 "part:docs":
   - changed-files:
@@ -62,6 +68,8 @@
     - any-glob-to-any-file:
       - "src/frequenz/core/math.py"
       - "src/frequenz/core/math/**"
+      - "tests/test_math.py"
+      - "tests/math/**"
 
 "part:tests":
   - changed-files:
@@ -90,3 +98,5 @@
     - any-glob-to-any-file:
       - "src/frequenz/core/typing.py"
       - "src/frequenz/core/typing/**"
+      - "tests/test_typing.py"
+      - "tests/typing/**"
