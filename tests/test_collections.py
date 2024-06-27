@@ -34,6 +34,22 @@ class CustomComparable:
 
 
 @pytest.mark.parametrize(
+    "start, end",
+    [
+        (10.0, -100.0),
+        (CustomComparable(10), CustomComparable(-100)),
+    ],
+)
+def test_invalid_range(start: LessThanComparable, end: LessThanComparable) -> None:
+    """Test if the interval has an invalid range."""
+    with pytest.raises(
+        ValueError,
+        match=rf"The start \({start}\) can't be bigger than end \({end}\)",
+    ):
+        Interval(start, end)
+
+
+@pytest.mark.parametrize(
     "start, end, within, at_start, at_end, before_start, after_end",
     [
         (10.0, 100.0, 50.0, 10.0, 100.0, 9.0, 101.0),

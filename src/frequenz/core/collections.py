@@ -27,6 +27,11 @@ class Interval(Generic[LessThanComparableOrNoneT]):
     The `start` and `end` are inclusive, meaning that the `start` and `end` limites are
     included in the range when checking if a value is contained by the interval.
 
+    If the `start` or `end` is `None`, it means that the interval is unbounded in that
+    direction.
+
+    If `start` is bigger than `end`, a `ValueError` is raised.
+
     The type stored in the interval must be comparable, meaning that it must implement
     the `__lt__` method to be able to compare values.
     """
@@ -36,6 +41,17 @@ class Interval(Generic[LessThanComparableOrNoneT]):
 
     end: LessThanComparableOrNoneT
     """The end of the interval."""
+
+    def __post_init__(self) -> None:
+        """Check if the start is less than or equal to the end."""
+        if self.start is None or self.end is None:
+            return
+        start = cast(LessThanComparable, self.start)
+        end = cast(LessThanComparable, self.end)
+        if start > end:
+            raise ValueError(
+                f"The start ({self.start}) can't be bigger than end ({self.end})"
+            )
 
     def __contains__(self, item: LessThanComparableOrNoneT) -> bool:
         """
