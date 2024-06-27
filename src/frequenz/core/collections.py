@@ -4,39 +4,40 @@
 """Data structures that contain collections of values or objects."""
 
 from dataclasses import dataclass
-from typing import Any, Generic, Protocol, TypeVar, cast
+from typing import Generic, Protocol, Self, TypeVar, cast
 
 
-class Comparable(Protocol):
-    """A protocol that requires the implementation of comparison methods.
+class LessThanComparable(Protocol):
+    """A protocol that requires the `__lt__` method to compare values."""
 
-    This protocol is used to ensure that types can be compared using
-    the less than or equal to (`<=`) and greater than or equal to (`>=`)
-    operators.
-    """
-
-    def __le__(self, other: Any, /) -> bool:
-        """Return whether this instance is less than or equal to `other`."""
-
-    def __ge__(self, other: Any, /) -> bool:
-        """Return whether this instance is greater than or equal to `other`."""
+    def __lt__(self, other: Self, /) -> bool:
+        """Return whether self is less than other."""
 
 
-ComparableOrNoneT = TypeVar("ComparableOrNoneT", bound=Comparable | None)
-"""Type variable for values that are comparable or `None`."""
+LessThanComparableOrNoneT = TypeVar(
+    "LessThanComparableOrNoneT", bound=LessThanComparable | None
+)
+"""Type variable for a value that a `LessThanComparable` or `None`."""
 
 
 @dataclass(frozen=True)
-class Bounds(Generic[ComparableOrNoneT]):
-    """Lower and upper bound values."""
+class Bounds(Generic[LessThanComparableOrNoneT]):
+    """A range of values with lower and upper bounds.
 
-    lower: ComparableOrNoneT
+    The bounds are inclusive, meaning that the lower and upper bounds are included in
+    the range when checking if a value is within the range.
+
+    The type stored in the bounds must be comparable, meaning that it must implement the
+    `__lt__` method to be able to compare values.
+    """
+
+    lower: LessThanComparableOrNoneT
     """Lower bound."""
 
-    upper: ComparableOrNoneT
+    upper: LessThanComparableOrNoneT
     """Upper bound."""
 
-    def __contains__(self, item: ComparableOrNoneT) -> bool:
+    def __contains__(self, item: LessThanComparableOrNoneT) -> bool:
         """
         Check if the value is within the range of the container.
 
@@ -46,11 +47,24 @@ class Bounds(Generic[ComparableOrNoneT]):
         Returns:
             bool: True if value is within the range, otherwise False.
         """
+        if item is None:
+            return False
+        casted_item = cast(LessThanComparable, item)
+
         if self.lower is None and self.upper is None:
             return True
         if self.lower is None:
-            return item <= self.upper
+            upper = cast(LessThanComparable, self.upper)
+            return not casted_item > upper
         if self.upper is None:
-            return self.lower <= item
-
-        return cast(Comparable, self.lower) <= item <= cast(Comparable, self.upper)
+            return not self.lower > item
+        # mypy seems to get confused here, not being able to narrow upper and lower to
+        # just LessThanComparable, complaining with:
+        #   error: Unsupported left operand type for <= (some union)
+        # But we know if they are not None, they should be LessThanComparable, and
+        # actually mypy is being able to figure it out in the lines above, just not in
+        # this one, so it should be safe to cast.
+        return not (
+            casted_item < cast(LessThanComparable, self.lower)
+            or casted_item > cast(LessThanComparable, self.upper)
+        )
