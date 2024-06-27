@@ -4,39 +4,36 @@
 """Tests for the collections module."""
 
 
-from datetime import datetime
-
-from frequenz.sdk.timeseries._base_types import Bounds, SystemBounds
-from frequenz.sdk.timeseries._quantities import Power
+from frequenz.core.collections import Bounds
 
 
 def test_bounds_contains() -> None:
     """Tests with complete bounds."""
-    bounds = Bounds(lower=Power.from_watts(10), upper=Power.from_watts(100))
-    assert Power.from_watts(50) in bounds  # within
-    assert Power.from_watts(10) in bounds  # at lower
-    assert Power.from_watts(100) in bounds  # at upper
-    assert Power.from_watts(9) not in bounds  # below lower
-    assert Power.from_watts(101) not in bounds  # above upper
+    bounds = Bounds(lower=10.0, upper=100.0)
+    assert 50.0 in bounds  # within
+    assert 10.0 in bounds  # at lower
+    assert 100.0 in bounds  # at upper
+    assert 9.0 not in bounds  # below lower
+    assert 101.0 not in bounds  # above upper
 
 
 def test_bounds_contains_no_lower() -> None:
     """Tests without lower bound."""
-    bounds_no_lower = Bounds(lower=None, upper=Power.from_watts(100))
-    assert Power.from_watts(50) in bounds_no_lower  # within upper
-    assert Power.from_watts(100) in bounds_no_lower  # at upper
-    assert Power.from_watts(101) not in bounds_no_lower  # above upper
+    bounds_no_lower = Bounds(lower=None, upper=100.0)
+    assert 50.0 in bounds_no_lower  # within upper
+    assert 100.0 in bounds_no_lower  # at upper
+    assert 101.0 not in bounds_no_lower  # above upper
 
 
 def test_bounds_contains_no_upper() -> None:
     """Tests without upper bound."""
-    bounds_no_upper = Bounds(lower=Power.from_watts(10), upper=None)
-    assert Power.from_watts(50) in bounds_no_upper  # within lower
-    assert Power.from_watts(10) in bounds_no_upper  # at lower
-    assert Power.from_watts(9) not in bounds_no_upper  # below lower
+    bounds_no_upper = Bounds(lower=10.0, upper=None)
+    assert 50.0 in bounds_no_upper  # within lower
+    assert 10.0 in bounds_no_upper  # at lower
+    assert 9.0 not in bounds_no_upper  # below lower
 
 
 def test_bounds_contains_no_bounds() -> None:
     """Tests with no bounds."""
-    bounds_no_bounds: Bounds[Power | None] = Bounds(lower=None, upper=None)
-    assert Power.from_watts(50) in bounds_no_bounds  # any value within bounds
+    bounds_no_bounds: Bounds[float | None] = Bounds(lower=None, upper=None)
+    assert 50.0 in bounds_no_bounds  # any value within bounds
