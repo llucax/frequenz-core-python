@@ -22,20 +22,21 @@ class Comparable(Protocol):
         """Return whether this instance is greater than or equal to `other`."""
 
 
-_T = TypeVar("_T", bound=Comparable | None)
+ComparableOrNoneT = TypeVar("ComparableOrNoneT", bound=Comparable | None)
+"""Type variable for values that are comparable or `None`."""
 
 
 @dataclass(frozen=True)
-class Bounds(Generic[_T]):
+class Bounds(Generic[ComparableOrNoneT]):
     """Lower and upper bound values."""
 
-    lower: _T
+    lower: ComparableOrNoneT
     """Lower bound."""
 
-    upper: _T
+    upper: ComparableOrNoneT
     """Upper bound."""
 
-    def __contains__(self, item: _T) -> bool:
+    def __contains__(self, item: ComparableOrNoneT) -> bool:
         """
         Check if the value is within the range of the container.
 
