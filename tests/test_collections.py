@@ -8,7 +8,7 @@ from typing import Self
 
 import pytest
 
-from frequenz.core.collections import Bounds, LessThanComparable
+from frequenz.core.collections import Interval, LessThanComparable
 
 
 class CustomComparable:
@@ -34,7 +34,7 @@ class CustomComparable:
 
 
 @pytest.mark.parametrize(
-    "lower, upper, within, at_lower, at_upper, below_lower, above_upper",
+    "start, end, within, at_start, at_end, before_start, after_end",
     [
         (10.0, 100.0, 50.0, 10.0, 100.0, 9.0, 101.0),
         (
@@ -48,26 +48,26 @@ class CustomComparable:
         ),
     ],
 )
-def test_bounds_contains(  # pylint: disable=too-many-arguments
-    lower: LessThanComparable,
-    upper: LessThanComparable,
+def test_interval_contains(  # pylint: disable=too-many-arguments
+    start: LessThanComparable,
+    end: LessThanComparable,
     within: LessThanComparable,
-    at_lower: LessThanComparable,
-    at_upper: LessThanComparable,
-    below_lower: LessThanComparable,
-    above_upper: LessThanComparable,
+    at_start: LessThanComparable,
+    at_end: LessThanComparable,
+    before_start: LessThanComparable,
+    after_end: LessThanComparable,
 ) -> None:
-    """Test if a value is within the bounds."""
-    bounds = Bounds(lower=lower, upper=upper)
-    assert within in bounds  # within
-    assert at_lower in bounds  # at lower
-    assert at_upper in bounds  # at upper
-    assert below_lower not in bounds  # below lower
-    assert above_upper not in bounds  # above upper
+    """Test if a value is within the interval."""
+    interval = Interval(start=start, end=end)
+    assert within in interval  # within
+    assert at_start in interval  # at start
+    assert at_end in interval  # at end
+    assert before_start not in interval  # before start
+    assert after_end not in interval  # after end
 
 
 @pytest.mark.parametrize(
-    "upper, within, at_upper, above_upper",
+    "end, within, at_end, after_end",
     [
         (100.0, 50.0, 100.0, 101.0),
         (
@@ -78,21 +78,21 @@ def test_bounds_contains(  # pylint: disable=too-many-arguments
         ),
     ],
 )
-def test_bounds_contains_no_lower(
-    upper: LessThanComparable,
+def test_interval_contains_no_start(
+    end: LessThanComparable,
     within: LessThanComparable,
-    at_upper: LessThanComparable,
-    above_upper: LessThanComparable,
+    at_end: LessThanComparable,
+    after_end: LessThanComparable,
 ) -> None:
-    """Test if a value is within the bounds with no lower bound."""
-    bounds_no_lower = Bounds(lower=None, upper=upper)
-    assert within in bounds_no_lower  # within upper
-    assert at_upper in bounds_no_lower  # at upper
-    assert above_upper not in bounds_no_lower  # above upper
+    """Test if a value is within the interval with no start."""
+    interval_no_start = Interval(start=None, end=end)
+    assert within in interval_no_start  # within end
+    assert at_end in interval_no_start  # at end
+    assert after_end not in interval_no_start  # after end
 
 
 @pytest.mark.parametrize(
-    "lower, within, at_lower, below_lower",
+    "start, within, at_start, before_start",
     [
         (10.0, 50.0, 10.0, 9.0),
         (
@@ -103,17 +103,17 @@ def test_bounds_contains_no_lower(
         ),
     ],
 )
-def test_bounds_contains_no_upper(
-    lower: LessThanComparable,
+def test_interval_contains_no_end(
+    start: LessThanComparable,
     within: LessThanComparable,
-    at_lower: LessThanComparable,
-    below_lower: LessThanComparable,
+    at_start: LessThanComparable,
+    before_start: LessThanComparable,
 ) -> None:
-    """Test if a value is within the bounds with no upper bound."""
-    bounds_no_upper = Bounds(lower=lower, upper=None)
-    assert within in bounds_no_upper  # within lower
-    assert at_lower in bounds_no_upper  # at lower
-    assert below_lower not in bounds_no_upper  # below lower
+    """Test if a value is within the interval with no end."""
+    interval_no_end = Interval(start=start, end=None)
+    assert within in interval_no_end  # within start
+    assert at_start in interval_no_end  # at start
+    assert before_start not in interval_no_end  # before start
 
 
 @pytest.mark.parametrize(
@@ -127,7 +127,9 @@ def test_bounds_contains_no_upper(
         CustomComparable(-10),
     ],
 )
-def test_bounds_contains_no_bounds(value: LessThanComparable) -> None:
-    """Test if a value is within the bounds with no bounds."""
-    bounds_no_bounds: Bounds[LessThanComparable | None] = Bounds(lower=None, upper=None)
-    assert value in bounds_no_bounds  # any value within bounds
+def test_interval_contains_unbound(value: LessThanComparable) -> None:
+    """Test if a value is within the interval with no bounds."""
+    interval_no_bounds: Interval[LessThanComparable | None] = Interval(
+        start=None, end=None
+    )
+    assert value in interval_no_bounds  # any value within bounds

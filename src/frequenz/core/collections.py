@@ -21,21 +21,21 @@ LessThanComparableOrNoneT = TypeVar(
 
 
 @dataclass(frozen=True)
-class Bounds(Generic[LessThanComparableOrNoneT]):
-    """A range of values with lower and upper bounds.
+class Interval(Generic[LessThanComparableOrNoneT]):
+    """An interval to test if a value is within its limits.
 
-    The bounds are inclusive, meaning that the lower and upper bounds are included in
-    the range when checking if a value is within the range.
+    The `start` and `end` are inclusive, meaning that the `start` and `end` limites are
+    included in the range when checking if a value is contained by the interval.
 
-    The type stored in the bounds must be comparable, meaning that it must implement the
-    `__lt__` method to be able to compare values.
+    The type stored in the interval must be comparable, meaning that it must implement
+    the `__lt__` method to be able to compare values.
     """
 
-    lower: LessThanComparableOrNoneT
-    """Lower bound."""
+    start: LessThanComparableOrNoneT
+    """The start of the interval."""
 
-    upper: LessThanComparableOrNoneT
-    """Upper bound."""
+    end: LessThanComparableOrNoneT
+    """The end of the interval."""
 
     def __contains__(self, item: LessThanComparableOrNoneT) -> bool:
         """
@@ -51,20 +51,20 @@ class Bounds(Generic[LessThanComparableOrNoneT]):
             return False
         casted_item = cast(LessThanComparable, item)
 
-        if self.lower is None and self.upper is None:
+        if self.start is None and self.end is None:
             return True
-        if self.lower is None:
-            upper = cast(LessThanComparable, self.upper)
-            return not casted_item > upper
-        if self.upper is None:
-            return not self.lower > item
-        # mypy seems to get confused here, not being able to narrow upper and lower to
+        if self.start is None:
+            start = cast(LessThanComparable, self.end)
+            return not casted_item > start
+        if self.end is None:
+            return not self.start > item
+        # mypy seems to get confused here, not being able to narrow start and end to
         # just LessThanComparable, complaining with:
         #   error: Unsupported left operand type for <= (some union)
         # But we know if they are not None, they should be LessThanComparable, and
         # actually mypy is being able to figure it out in the lines above, just not in
         # this one, so it should be safe to cast.
         return not (
-            casted_item < cast(LessThanComparable, self.lower)
-            or casted_item > cast(LessThanComparable, self.upper)
+            casted_item < cast(LessThanComparable, self.start)
+            or casted_item > cast(LessThanComparable, self.end)
         )
