@@ -116,6 +116,80 @@ class Interval(Generic[LessThanComparableOrNoneT]):
         return f"[{start}, {end}]"
 
 
+def merge_intervals(
+    *intervals: Interval[LessThanComparableOrNoneT],
+) -> list[Interval[LessThanComparableOrNoneT]]:
+    """Merge overlapping intervals into the minimum number of intervals needed.
+
+    The returned list is sorted by interval start values.
+
+    Args:
+        *intervals: The list of intervals to merge.
+
+    Returns:
+        The merged (and sorted) list of intervals.
+    """
+    if not intervals:
+        return []
+
+    def _interval_cmp(
+        interval1: Interval[LessThanComparableOrNoneT],
+        interval2: Interval[LessThanComparableOrNoneT],
+    ) -> int:
+        """Compare two intervals by their start values."""
+        if interval1.start == interval2.start:
+            return 0
+        if interval1.start is None:
+            return -1
+        if interval2.start is None:
+            return 1
+        casted_start1 = cast(LessThanComparable, interval1.start)
+        casted_start2 = cast(LessThanComparable, interval2.start)
+        return -1 if casted_start1 < casted_start2 else 1
+
+    def _limits_overlap(
+        prev_end: LessThanComparable, next_start: LessThanComparableOrNoneT
+    ) -> bool:
+        """Check if the limits of two intervals overlap."""
+        if next_start is None:
+            return True
+        casted_next_start = cast(LessThanComparable, next_start)
+        if not casted_next_start > prev_end:
+            return True
+        return False
+
+    # Sort intervals by their start value, treating None as the smallest possible value
+    sorted_intervals = sorted(intervals, key=cmp_to_key(_interval_cmp))
+
+    merged_intervals = []
+    current_start = sorted_intervals[0].start
+    current_end = sorted_intervals[0].end
+
+    for next_interval in sorted_intervals[1:]:
+        if next_interval.end is None:
+            current_end = None
+
+        if current_end is None:
+            break
+
+        casted_current_end = cast(LessThanComparable, current_end)
+        if _limits_overlap(casted_current_end, next_interval.start):
+            # Overlap, we need to merge, so update the current interval end if needed
+            casted_next_end = cast(LessThanComparable, next_interval.end)
+            if next_interval.end is not None and casted_next_end > casted_current_end:
+                current_end = next_interval.end
+        else:
+            # No overlap, add the current interval to the list and reset the current interval
+            merged_intervals.append(Interval(current_start, current_end))
+            current_start = next_interval.start
+            current_end = next_interval.end
+
+    # Add the last interval
+    merged_intervals.append(Interval(current_start, current_end))
+
+    return merged_intervals
+
+
 class Bounds(Generic[LessThanComparableOrNoneT]):
     """A set of allowed intervals to check if a value is within any of them.
 

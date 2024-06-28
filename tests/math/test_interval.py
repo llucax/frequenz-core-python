@@ -8,7 +8,7 @@ from typing import Self
 
 import pytest
 
-from frequenz.core.math import Bounds, Interval, LessThanComparable
+from frequenz.core.math import Bounds, Interval, LessThanComparable, merge_intervals
 
 
 class CustomComparable:
@@ -188,3 +188,45 @@ def test_bounds_with_many_intervals() -> None:
         assert value in bounds
     for value in [-3.0, -2.001, 0.1, 1.0, 2.0, 3.0, 6.01, 6.9999]:
         assert value not in bounds
+
+
+@pytest.mark.parametrize(
+    "intervals, expected",
+    [
+        # No intervals
+        ([], []),
+        # Single interval
+        ([Interval(1, 3)], [Interval(1, 3)]),
+        # Non-overlapping intervals
+        ([Interval(1, 2), Interval(3, 4)], [Interval(1, 2), Interval(3, 4)]),
+        # Overlapping intervals
+        ([Interval(1, 3), Interval(2, 4)], [Interval(1, 4)]),
+        (
+            [Interval(1, 5), Interval(2, 6), Interval(8, 10)],
+            [Interval(1, 6), Interval(8, 10)],
+        ),
+        # Contained intervals
+        ([Interval(1, 5), Interval(2, 3)], [Interval(1, 5)]),
+        # Touching intervals
+        ([Interval(1, 2), Interval(2, 3)], [Interval(1, 3)]),
+        # Open-ended intervals
+        ([Interval(None, 2), Interval(1, 3)], [Interval(None, 3)]),
+        ([Interval(1, None), Interval(2, 3)], [Interval(1, None)]),
+        ([Interval(None, 1), Interval(None, 2)], [Interval(None, 2)]),
+        ([Interval(2, None), Interval(1, None)], [Interval(1, None)]),
+        # Complex cases
+        (
+            [Interval(1, 3), Interval(5, 6), Interval(2, 4), Interval(7, 8)],
+            [Interval(1, 4), Interval(5, 6), Interval(7, 8)],
+        ),
+        ([Interval(None, 1), Interval(0, None)], [Interval(None, None)]),
+    ],
+    ids=repr,
+)
+def test_merge_intervals(
+    intervals: list[Interval[LessThanComparable | None]],
+    expected: list[Interval[LessThanComparable | None]],
+) -> None:
+    """Test merging intervals."""
+    result = merge_intervals(*intervals)
+    assert result == expected
