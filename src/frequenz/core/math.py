@@ -250,6 +250,9 @@ class Bounds(Generic[LessThanComparableOrNoneT]):
     ) -> None:
         """Initialize this instance providing a set of `intervals`.
 
+        If a list of `intervals` is provided, they are merged into the minimum number of
+        non-overlapping intervals needed to represent the same bounds.
+
         Args:
             *intervals: The set of intervals.
 
@@ -269,6 +272,9 @@ class Bounds(Generic[LessThanComparableOrNoneT]):
         but not both. If `upper` and `lower` are provided, a unique interval with those
         bounds is used.
 
+        If a list of `intervals` is provided, they are merged into the minimum number of
+        non-overlapping intervals needed to represent the same bounds.
+
         Args:
             *intervals: The set of intervals.
             lower: The lower bound.
@@ -283,7 +289,7 @@ class Bounds(Generic[LessThanComparableOrNoneT]):
         casted_lower = cast(LessThanComparableOrNoneT, lower)
         casted_upper = cast(LessThanComparableOrNoneT, upper)
         self._intervals: frozenset[Interval[LessThanComparableOrNoneT]] = frozenset(
-            intervals or [Interval(casted_lower, casted_upper)]
+            merge_intervals(*(intervals or [Interval(casted_lower, casted_upper)]))
         )
 
     def __contains__(self, item: LessThanComparableOrNoneT) -> bool:
