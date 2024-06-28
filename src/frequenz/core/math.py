@@ -251,7 +251,9 @@ class Bounds(Generic[LessThanComparableOrNoneT]):
         """Initialize this instance providing a set of `intervals`.
 
         If a list of `intervals` is provided, they are merged into the minimum number of
-        non-overlapping intervals needed to represent the same bounds.
+        non-overlapping intervals needed to represent the same bounds, so when accessing
+        the [`intervals`][frequenz.core.collections.Bounds.intervals] property, the
+        intervals might not be the same as the ones passed to the constructor.
 
         Args:
             *intervals: The set of intervals.
@@ -273,7 +275,9 @@ class Bounds(Generic[LessThanComparableOrNoneT]):
         bounds is used.
 
         If a list of `intervals` is provided, they are merged into the minimum number of
-        non-overlapping intervals needed to represent the same bounds.
+        non-overlapping intervals needed to represent the same bounds, so when accessing
+        the [`intervals`][frequenz.core.collections.Bounds.intervals] property, the
+        intervals might not be the same as the ones passed to the constructor.
 
         Args:
             *intervals: The set of intervals.
@@ -291,6 +295,11 @@ class Bounds(Generic[LessThanComparableOrNoneT]):
         self._intervals: frozenset[Interval[LessThanComparableOrNoneT]] = frozenset(
             merge_intervals(*(intervals or [Interval(casted_lower, casted_upper)]))
         )
+
+    @property
+    def intervals(self) -> frozenset[Interval[LessThanComparableOrNoneT]]:
+        """The set of intervals that define these bounds."""
+        return self._intervals
 
     def __contains__(self, item: LessThanComparableOrNoneT) -> bool:
         """Check if `item` is within the bounds of this instance.
