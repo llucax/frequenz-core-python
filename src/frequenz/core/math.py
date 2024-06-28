@@ -114,3 +114,114 @@ class Interval(Generic[LessThanComparableOrNoneT]):
         start = "∞" if self.start is None else str(self.start)
         end = "∞" if self.end is None else str(self.end)
         return f"[{start}, {end}]"
+
+
+class Bounds(Generic[LessThanComparableOrNoneT]):
+    """A set of allowed intervals to check if a value is within any of them.
+
+    Bounds are used to check if a value is within the limits of some allowed intervals.
+    Like [`Interval`][frequenz.core.collections.Interval], the limits of the intervals
+    are inclusive, and if open intervals are allowed, they can be represented by using
+    `None` as the limit.
+
+    Example:
+        Given the following bounds representation:
+
+        ```
+               -2       0       2       4       6   7   8   9    ...
+        <-------[ALLOWED]---------------[ALLOWED]---[ALLOWED------->
+        ```
+
+        The value `-2`, `-1.9999`, `-0.5`, `0`, `4`, `5, `6`, `7`, `8`, `9` and `1090349.0349` all
+        all within the bounds, but `-3`, `-2.001`, `0.1`, `1`, `2`, `3`, `6.01` and
+        `6.9999` are not.
+
+        These bounds can be represented by the following code:
+
+        ```python
+        from frequenz.core.collections import Bounds, Interval
+
+        bounds: Bounds[float | None] = Bounds(
+            Interval(-2.0, 0.0), Interval(4.0, 6.0), Interval(7.0, None)
+        )
+        for value in [-2.0, -1.9999, -0.5, 0.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 1090349.0349]:
+            assert value in bounds
+        for value in [-3.0, -2.001, 0.1, 1.0, 2.0, 3.0, 6.01, 6.9999]:
+            assert value not in bounds
+        ```
+    """
+
+    @overload
+    def __init__(  # noqa: DOC502 (Raises without a raise statement)
+        self,
+        *,
+        lower: LessThanComparableOrNoneT | None = None,
+        upper: LessThanComparableOrNoneT | None = None,
+    ) -> None:
+        """Initialize this instance providing an `upper` and `lower` bound.
+
+        Args:
+            lower: The lower bound.
+            upper: The upper bound.
+
+        Raises:
+            ValueError: If both `upper` and `lower` are `None` or if `lower` is bigger
+                than the `upper`.
+        """
+
+    @overload
+    def __init__(  # noqa: DOC502 (Raises without a raise statement)
+        self,
+        *intervals: Interval[LessThanComparableOrNoneT],
+    ) -> None:
+        """Initialize this instance providing a set of `intervals`.
+
+        Args:
+            *intervals: The set of intervals.
+
+        Raises:
+            ValueError: If no intervals are provided.
+        """
+
+    def __init__(
+        self,
+        *intervals: Interval[LessThanComparableOrNoneT],
+        lower: LessThanComparableOrNoneT | None = None,
+        upper: LessThanComparableOrNoneT | None = None,
+    ) -> None:
+        """Initialize this instance providing an `upper` and `lower` bound or a set of `intervals`.
+
+        Either a set of `intervals` or an `upper` and `lower` bound must be provided,
+        but not both. If `upper` and `lower` are provided, a unique interval with those
+        bounds is used.
+
+        Args:
+            *intervals: The set of intervals.
+            lower: The lower bound.
+            upper: The upper bound.
+
+        Raises:
+            ValueError: If no intervals are provided, or if both `upper` and `lower` are
+                `None`, or if `lower` is bigger than the `upper`.
+        """
+        if not intervals and lower is None and upper is None:
+            raise ValueError("At least one interval or bound must be provided")
+        casted_lower = cast(LessThanComparableOrNoneT, lower)
+        casted_upper = cast(LessThanComparableOrNoneT, upper)
+        self._intervals: frozenset[Interval[LessThanComparableOrNoneT]] = frozenset(
+            intervals or [Interval(casted_lower, casted_upper)]
+        )
+
+    def __contains__(self, item: LessThanComparableOrNoneT) -> bool:
+        """Check if `item` is within the bounds of this instance.
+
+        Args:
+            item: The value to check.
+
+        Returns:
+            bool: Whether `item` is within the bounds.
+        """
+        for interval in self._intervals:
+            if item in interval:
+                return True
+        return False

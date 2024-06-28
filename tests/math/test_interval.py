@@ -8,7 +8,7 @@ from typing import Self
 
 import pytest
 
-from frequenz.core.math import Interval, LessThanComparable
+from frequenz.core.math import Bounds, Interval, LessThanComparable
 
 
 class CustomComparable:
@@ -149,3 +149,42 @@ def test_contains_unbound(value: LessThanComparable) -> None:
         start=None, end=None
     )
     assert value in interval_no_bounds  # any value within bounds
+
+
+def test_bounds_constructor_fail() -> None:
+    """Test that bounds can't be created without any limits."""
+    with pytest.raises(
+        ValueError, match="At least one interval or bound must be provided"
+    ):
+        Bounds()
+
+
+def test_bounds_with_upper_lower() -> None:
+    """Test that bounds are created correctly with upper and lower limits."""
+    bounds = Bounds(lower=10.0, upper=100.0)
+    assert 10.0 in bounds
+    assert 100.0 in bounds
+    assert 50.0 in bounds
+    assert 9.0 not in bounds
+    assert 100.0001 not in bounds
+
+
+def test_bounds_with_interval() -> None:
+    """Test that bounds are created correctly with an interval."""
+    bounds = Bounds(Interval(10.0, 100.0))
+    assert 10.0 in bounds
+    assert 100.0 in bounds
+    assert 50.0 in bounds
+    assert 9.0 not in bounds
+    assert 100.0001 not in bounds
+
+
+def test_bounds_with_many_intervals() -> None:
+    """Test that bounds are created correctly with multiple intervals."""
+    bounds: Bounds[float | None] = Bounds(
+        Interval(-2.0, 0.0), Interval(4.0, 6.0), Interval(7.0, None)
+    )
+    for value in [-2.0, -1.9999, -0.5, 0.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 1090349.0349]:
+        assert value in bounds
+    for value in [-3.0, -2.001, 0.1, 1.0, 2.0, 3.0, 6.01, 6.9999]:
+        assert value not in bounds
