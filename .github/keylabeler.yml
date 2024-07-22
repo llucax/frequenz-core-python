@@ -16,6 +16,7 @@ labelMappings:
   "part:collections": "part:collections"
   "part:datetime": "part:datetime"
   "part:docs": "part:docs"
+  "part:logging": "part:logging"
   "part:math": "part:math"
   "part:tests": "part:tests"
   "part:tooling": "part:tooling"
