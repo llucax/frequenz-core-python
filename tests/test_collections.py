@@ -8,7 +8,7 @@ from typing import Self
 
 import pytest
 
-from frequenz.core.collections import Interval, LessThanComparable
+from frequenz.core.math import Interval, LessThanComparable
 
 
 class CustomComparable:
