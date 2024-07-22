@@ -40,7 +40,7 @@ LessThanComparableOrNoneT = TypeVar(
 """Type variable for a value that a `LessThanComparable` or `None`."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, repr=False)
 class Interval(Generic[LessThanComparableOrNoneT]):
     """An interval to test if a value is within its limits.
 
@@ -104,3 +104,13 @@ class Interval(Generic[LessThanComparableOrNoneT]):
             casted_item < cast(LessThanComparable, self.start)
             or casted_item > cast(LessThanComparable, self.end)
         )
+
+    def __repr__(self) -> str:
+        """Return a string representation of this instance."""
+        return f"Interval({self.start!r}, {self.end!r})"
+
+    def __str__(self) -> str:
+        """Return a string representation of this instance."""
+        start = "∞" if self.start is None else str(self.start)
+        end = "∞" if self.end is None else str(self.end)
+        return f"[{start}, {end}]"
