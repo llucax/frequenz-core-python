@@ -105,11 +105,13 @@ class BackgroundService(abc.ABC):
 
         Args:
             unique_id: The string to uniquely identify this background service instance.
-                If `None`, `str(id(self))` will be used. This is used in `__repr__` and
-                `__str__` methods, so it is used mainly for debugging purposes, to
-                identify a particular instance of a background service.
+                If `None`, a string based on `hex(id(self))` will be used. This is
+                used in `__repr__` and `__str__` methods, mainly for debugging
+                purposes, to identify a particular instance of a background service.
         """
-        self._unique_id: str = str(id(self)) if unique_id is None else unique_id
+        # [2:] is used to remove the '0x' prefix from the hex representation of the id,
+        # as it doesn't add any uniqueness to the string.
+        self._unique_id: str = hex(id(self))[2:] if unique_id is None else unique_id
         self._tasks: set[asyncio.Task[Any]] = set()
 
     @abc.abstractmethod
