@@ -120,16 +120,12 @@ class BackgroundService(abc.ABC):
 
     @property
     def unique_id(self) -> str:
-        """The unique ID of this background service.
-
-        Returns:
-            The unique ID of this background service.
-        """
+        """The unique ID of this background service."""
         return self._unique_id
 
     @property
     def tasks(self) -> collections.abc.Set[asyncio.Task[Any]]:
-        """Return the set of running tasks spawned by this background service.
+        """The set of running tasks spawned by this background service.
 
         Users typically should not modify the tasks in the returned set and only use
         them for informational purposes.
@@ -138,20 +134,14 @@ class BackgroundService(abc.ABC):
 
             Changing the returned tasks may lead to unexpected behavior, don't do it
             unless the class explicitly documents it is safe to do so.
-
-        Returns:
-            The set of running tasks spawned by this background service.
         """
         return self._tasks
 
     @property
     def is_running(self) -> bool:
-        """Return whether this background service is running.
+        """Whether this background service is running.
 
         A service is considered running when at least one task is running.
-
-        Returns:
-            Whether this background service is running.
         """
         return any(not task.done() for task in self._tasks)
 
