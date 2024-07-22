@@ -64,7 +64,7 @@ def test_invalid_range(start: LessThanComparable, end: LessThanComparable) -> No
         ),
     ],
 )
-def test_interval_contains(  # pylint: disable=too-many-arguments
+def test_contains(  # pylint: disable=too-many-arguments
     start: LessThanComparable,
     end: LessThanComparable,
     within: LessThanComparable,
@@ -94,7 +94,7 @@ def test_interval_contains(  # pylint: disable=too-many-arguments
         ),
     ],
 )
-def test_interval_contains_no_start(
+def test_contains_no_start(
     end: LessThanComparable,
     within: LessThanComparable,
     at_end: LessThanComparable,
@@ -119,7 +119,7 @@ def test_interval_contains_no_start(
         ),
     ],
 )
-def test_interval_contains_no_end(
+def test_contains_no_end(
     start: LessThanComparable,
     within: LessThanComparable,
     at_start: LessThanComparable,
@@ -143,7 +143,7 @@ def test_interval_contains_no_end(
         CustomComparable(-10),
     ],
 )
-def test_interval_contains_unbound(value: LessThanComparable) -> None:
+def test_contains_unbound(value: LessThanComparable) -> None:
     """Test if a value is within the interval with no bounds."""
     interval_no_bounds: Interval[LessThanComparable | None] = Interval(
         start=None, end=None
