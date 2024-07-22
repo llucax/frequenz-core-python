@@ -199,6 +199,10 @@ def test_bounds_with_many_intervals() -> None:
         ([Interval(1, 3)], [Interval(1, 3)]),
         # Non-overlapping intervals
         ([Interval(1, 2), Interval(3, 4)], [Interval(1, 2), Interval(3, 4)]),
+        (
+            [Interval(-2.0, 0.0), Interval(4.0, 6.0), Interval(7.0, None)],
+            [Interval(-2.0, 0.0), Interval(4.0, 6.0), Interval(7.0, None)],
+        ),
         # Overlapping intervals
         ([Interval(1, 3), Interval(2, 4)], [Interval(1, 4)]),
         (

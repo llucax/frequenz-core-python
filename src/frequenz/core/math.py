@@ -4,8 +4,9 @@
 """Math tools."""
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Generic, Protocol, Self, TypeVar, cast
+from typing import Generic, Protocol, Self, TypeVar, cast, overload
 
 
 def is_close_to_zero(value: float, abs_tol: float = 1e-9) -> bool:
@@ -165,11 +166,11 @@ def merge_intervals(
     current_start = sorted_intervals[0].start
     current_end = sorted_intervals[0].end
 
+    print(f"MERGING {sorted_intervals}")
     for next_interval in sorted_intervals[1:]:
-        if next_interval.end is None:
-            current_end = None
-
+        print(f"   MERGING {current_start} - {current_end} with {next_interval}")
         if current_end is None:
+            print("     NO END! GIVING UP!")
             break
 
         casted_current_end = cast(LessThanComparable, current_end)
@@ -178,13 +179,16 @@ def merge_intervals(
             casted_next_end = cast(LessThanComparable, next_interval.end)
             if next_interval.end is not None and casted_next_end > casted_current_end:
                 current_end = next_interval.end
+            print(f"     OVERLAP! MERGED to {current_start} - {current_end}")
         else:
             # No overlap, add the current interval to the list and reset the current interval
             merged_intervals.append(Interval(current_start, current_end))
             current_start = next_interval.start
             current_end = next_interval.end
+            print(f"     NO OVERLAP! ADDED {current_start} - {current_end}")
 
     # Add the last interval
+    print(f"     ADDING LAST {current_start} - {current_end}")
     merged_intervals.append(Interval(current_start, current_end))
 
     return merged_intervals
@@ -292,13 +296,13 @@ class Bounds(Generic[LessThanComparableOrNoneT]):
             raise ValueError("At least one interval or bound must be provided")
         casted_lower = cast(LessThanComparableOrNoneT, lower)
         casted_upper = cast(LessThanComparableOrNoneT, upper)
-        self._intervals: frozenset[Interval[LessThanComparableOrNoneT]] = frozenset(
-            merge_intervals(*(intervals or [Interval(casted_lower, casted_upper)]))
+        self._intervals = merge_intervals(
+            *(intervals or [Interval(casted_lower, casted_upper)])
         )
 
     @property
-    def intervals(self) -> frozenset[Interval[LessThanComparableOrNoneT]]:
-        """The set of intervals that define these bounds."""
+    def intervals(self) -> Sequence[Interval[LessThanComparableOrNoneT]]:
+        """The set of intervals that define these bounds, sorted by start value."""
         return self._intervals
 
     def __contains__(self, item: LessThanComparableOrNoneT) -> bool:
@@ -310,7 +314,20 @@ class Bounds(Generic[LessThanComparableOrNoneT]):
         Returns:
             bool: Whether `item` is within the bounds.
         """
+        print(f"FINDING {item} IN {self._intervals}")
         for interval in self._intervals:
+            print(f">>>> {interval}")
             if item in interval:
+                print(f"     IN!")
                 return True
+            print(f"     NOPE!")
+        print("NOT FOUND :( ")
         return False
+
+    def __repr__(self) -> str:
+        """Return a string representation of this instance."""
+        return f"Bounds({self._intervals!r})"
+
+    def __str__(self) -> str:
+        """Return a string representation of this instance."""
+        return f"{{{'; '.join(str(interval) for interval in self._intervals)}}}"
