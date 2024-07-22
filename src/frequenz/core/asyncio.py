@@ -73,8 +73,8 @@ class BackgroundService(abc.ABC):
         import asyncio
 
         class Clock(BackgroundService):
-            def __init__(self, resolution_s: float, *, name: str | None = None) -> None:
-                super().__init__(name=name)
+            def __init__(self, resolution_s: float, *, unique_id: str | None = None) -> None:
+                super().__init__(unique_id=unique_id)
                 self._resolution_s = resolution_s
 
             def start(self) -> None:
@@ -100,14 +100,16 @@ class BackgroundService(abc.ABC):
         ```
     """
 
-    def __init__(self, *, name: str | None = None) -> None:
+    def __init__(self, *, unique_id: str | None = None) -> None:
         """Initialize this BackgroundService.
 
         Args:
-            name: The name of this background service. If `None`, `str(id(self))` will
-                be used. This is used mostly for debugging purposes.
+            unique_id: The string to uniquely identify this background service instance.
+                If `None`, `str(id(self))` will be used. This is used in `__repr__` and
+                `__str__` methods, so it is used mainly for debugging purposes, to
+                identify a particular instance of a background service.
         """
-        self._name: str = str(id(self)) if name is None else name
+        self._unique_id: str = str(id(self)) if unique_id is None else unique_id
         self._tasks: set[asyncio.Task[Any]] = set()
 
     @abc.abstractmethod
@@ -115,13 +117,13 @@ class BackgroundService(abc.ABC):
         """Start this background service."""
 
     @property
-    def name(self) -> str:
-        """The name of this background service.
+    def unique_id(self) -> str:
+        """The unique ID of this background service.
 
         Returns:
-            The name of this background service.
+            The unique ID of this background service.
         """
-        return self._name
+        return self._unique_id
 
     @property
     def tasks(self) -> collections.abc.Set[asyncio.Task[Any]]:
@@ -271,7 +273,7 @@ class BackgroundService(abc.ABC):
         Returns:
             A string representation of this instance.
         """
-        return f"{type(self).__name__}(name={self._name!r}, tasks={self._tasks!r})"
+        return f"{type(self).__name__}(unique_id={self._unique_id!r}, tasks={self._tasks!r})"
 
     def __str__(self) -> str:
         """Return a string representation of this instance.
@@ -279,4 +281,4 @@ class BackgroundService(abc.ABC):
         Returns:
             A string representation of this instance.
         """
-        return f"{type(self).__name__}[{self._name}]"
+        return f"{type(self).__name__}[{self._unique_id}]"

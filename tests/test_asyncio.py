@@ -25,12 +25,12 @@ class FakeService(BackgroundService):
     def __init__(
         self,
         *,
-        name: str | None = None,
+        unique_id: str | None = None,
         sleep: float | None = None,
         exc: BaseException | None = None,
     ) -> None:
         """Initialize a new FakeService."""
-        super().__init__(name=name)
+        super().__init__(unique_id=unique_id)
         self._sleep = sleep
         self._exc = exc
 
@@ -49,25 +49,28 @@ class FakeService(BackgroundService):
 async def test_construction_defaults() -> None:
     """Test the construction of a background service with default arguments."""
     fake_service = FakeService()
-    assert fake_service.name == str(id(fake_service))
+    assert fake_service.unique_id == str(id(fake_service))
     assert fake_service.tasks == set()
     assert fake_service.is_running is False
-    assert str(fake_service) == f"FakeService[{fake_service.name}]"
-    assert repr(fake_service) == f"FakeService(name={fake_service.name!r}, tasks=set())"
+    assert str(fake_service) == f"FakeService[{fake_service.unique_id}]"
+    assert (
+        repr(fake_service)
+        == f"FakeService(unique_id={fake_service.unique_id!r}, tasks=set())"
+    )
 
 
 async def test_construction_custom() -> None:
-    """Test the construction of a background service with a custom name."""
-    fake_service = FakeService(name="test")
-    assert fake_service.name == "test"
+    """Test the construction of a background service with a custom unique ID."""
+    fake_service = FakeService(unique_id="test")
+    assert fake_service.unique_id == "test"
     assert fake_service.tasks == set()
     assert fake_service.is_running is False
 
 
 async def test_start_await() -> None:
     """Test a background service starts and can be awaited."""
-    fake_service = FakeService(name="test")
-    assert fake_service.name == "test"
+    fake_service = FakeService(unique_id="test")
+    assert fake_service.unique_id == "test"
     assert fake_service.is_running is False
 
     # Is a no-op if the service is not running
@@ -86,8 +89,8 @@ async def test_start_await() -> None:
 
 async def test_start_stop() -> None:
     """Test a background service starts and stops correctly."""
-    fake_service = FakeService(name="test", sleep=2.0)
-    assert fake_service.name == "test"
+    fake_service = FakeService(unique_id="test", sleep=2.0)
+    assert fake_service.unique_id == "test"
     assert fake_service.is_running is False
 
     # Is a no-op if the service is not running
@@ -113,8 +116,8 @@ async def test_start_and_crash(
 ) -> None:
     """Test a background service reports when crashing."""
     exc = RuntimeError("error")
-    fake_service = FakeService(name="test", exc=exc)
-    assert fake_service.name == "test"
+    fake_service = FakeService(unique_id="test", exc=exc)
+    assert fake_service.unique_id == "test"
     assert fake_service.is_running is False
 
     fake_service.start()
@@ -141,7 +144,7 @@ async def test_start_and_crash(
 
 async def test_async_context_manager() -> None:
     """Test a background service works as an async context manager."""
-    async with FakeService(name="test", sleep=1.0) as fake_service:
+    async with FakeService(unique_id="test", sleep=1.0) as fake_service:
         assert fake_service.is_running is True
         # Is a no-op if the service is running
         fake_service.start()
