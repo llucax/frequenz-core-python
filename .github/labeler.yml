@@ -39,14 +39,6 @@
       - "tests/test_asyncio.py"
       - "tests/asyncio/**"
 
-"part:collections":
-  - changed-files:
-    - any-glob-to-any-file:
-      - "src/frequenz/core/collections.py"
-      - "src/frequenz/core/collections/**"
-      - "tests/test_collections.py"
-      - "tests/collections/**"
-
 "part:datetime":
   - changed-files:
     - any-glob-to-any-file:
