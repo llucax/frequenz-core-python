@@ -59,8 +59,7 @@ class Service(abc.ABC):
     [`stop()`][frequenz.core.asyncio.Service.stop] method, as the base
     implementation does not collect any results and re-raises all exceptions.
 
-    !!! warning
-
+    Warning:
         As services manage [`asyncio.Task`][] objects, a reference to them must be held
         for as long as the service is expected to be running, otherwise its tasks will
         be cancelled and the service will stop. For more information, please refer to
@@ -130,8 +129,7 @@ class Service(abc.ABC):
         Users typically should not modify the tasks in the returned set and only use
         them for informational purposes.
 
-        !!! danger
-
+        Danger:
             Changing the returned tasks may lead to unexpected behavior, don't do it
             unless the class explicitly documents it is safe to do so.
         """
