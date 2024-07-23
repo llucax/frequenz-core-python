@@ -10,8 +10,8 @@ The module provides the following classes and functions:
 
 - [cancel_and_await][frequenz.core.asyncio.cancel_and_await]: A function that cancels a
   task and waits for it to finish, handling `CancelledError` exceptions.
-- [BackgroundService][frequenz.core.asyncio.BackgroundService]: A base class for
-  implementing background services that can be started and stopped.
+- [Service][frequenz.core.asyncio.Service]: A base class for
+  implementing services running in the background that can be started and stopped.
 """
 
 
@@ -41,30 +41,30 @@ async def cancel_and_await(task: asyncio.Task[Any]) -> None:
         pass
 
 
-class BackgroundService(abc.ABC):
-    """A background service that can be started and stopped.
+class Service(abc.ABC):
+    """A service running in the background.
 
-    A background service is a service that runs in the background spawning one or more
-    tasks. The service can be [started][frequenz.core.asyncio.BackgroundService.start]
-    and [stopped][frequenz.core.asyncio.BackgroundService.stop] and can work as an
-    async context manager to provide deterministic cleanup.
+    A service swpawns one of more background tasks and can be
+    [started][frequenz.core.asyncio.Service.start] and
+    [stopped][frequenz.core.asyncio.Service.stop] and can work as an async context
+    manager to provide deterministic cleanup.
 
-    To implement a background service, subclasses must implement the
-    [`start()`][frequenz.core.asyncio.BackgroundService.start] method, which should
-    start the background tasks needed by the service, and add them to the `_tasks`
-    protected attribute.
+    To implement a service, subclasses must implement the
+    [`start()`][frequenz.core.asyncio.Service.start] method, which should start the
+    background tasks needed by the service, and add them to the `_tasks` protected
+    attribute.
 
     If you need to collect results or handle exceptions of the tasks when stopping the
     service, then you need to also override the
-    [`stop()`][frequenz.core.asyncio.BackgroundService.stop] method, as the base
+    [`stop()`][frequenz.core.asyncio.Service.stop] method, as the base
     implementation does not collect any results and re-raises all exceptions.
 
     !!! warning
 
-        As background services manage [`asyncio.Task`][] objects, a reference to them
-        must be held for as long as the background service is expected to be running,
-        otherwise its tasks will be cancelled and the service will stop. For more
-        information, please refer to the [Python `asyncio`
+        As services manage [`asyncio.Task`][] objects, a reference to them must be held
+        for as long as the service is expected to be running, otherwise its tasks will
+        be cancelled and the service will stop. For more information, please refer to
+        the [Python `asyncio`
         documentation](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task).
 
     Example:
@@ -72,7 +72,7 @@ class BackgroundService(abc.ABC):
         import datetime
         import asyncio
 
-        class Clock(BackgroundService):
+        class Clock(Service):
             def __init__(self, resolution_s: float, *, unique_id: str | None = None) -> None:
                 super().__init__(unique_id=unique_id)
                 self._resolution_s = resolution_s
@@ -101,13 +101,13 @@ class BackgroundService(abc.ABC):
     """
 
     def __init__(self, *, unique_id: str | None = None) -> None:
-        """Initialize this BackgroundService.
+        """Initialize this Service.
 
         Args:
-            unique_id: The string to uniquely identify this background service instance.
+            unique_id: The string to uniquely identify this service instance.
                 If `None`, a string based on `hex(id(self))` will be used. This is
                 used in `__repr__` and `__str__` methods, mainly for debugging
-                purposes, to identify a particular instance of a background service.
+                purposes, to identify a particular instance of a service.
         """
         # [2:] is used to remove the '0x' prefix from the hex representation of the id,
         # as it doesn't add any uniqueness to the string.
@@ -116,16 +116,16 @@ class BackgroundService(abc.ABC):
 
     @abc.abstractmethod
     def start(self) -> None:
-        """Start this background service."""
+        """Start this service."""
 
     @property
     def unique_id(self) -> str:
-        """The unique ID of this background service."""
+        """The unique ID of this service."""
         return self._unique_id
 
     @property
     def tasks(self) -> collections.abc.Set[asyncio.Task[Any]]:
-        """The set of running tasks spawned by this background service.
+        """The set of running tasks spawned by this service.
 
         Users typically should not modify the tasks in the returned set and only use
         them for informational purposes.
@@ -139,14 +139,14 @@ class BackgroundService(abc.ABC):
 
     @property
     def is_running(self) -> bool:
-        """Whether this background service is running.
+        """Whether this service is running.
 
         A service is considered running when at least one task is running.
         """
         return any(not task.done() for task in self._tasks)
 
     def cancel(self, msg: str | None = None) -> None:
-        """Cancel all running tasks spawned by this background service.
+        """Cancel all running tasks spawned by this service.
 
         Args:
             msg: The message to be passed to the tasks being cancelled.
@@ -155,7 +155,7 @@ class BackgroundService(abc.ABC):
             task.cancel(msg)
 
     async def stop(self, msg: str | None = None) -> None:
-        """Stop this background service.
+        """Stop this service.
 
         This method cancels all running tasks spawned by this service and waits for them
         to finish.
@@ -184,10 +184,10 @@ class BackgroundService(abc.ABC):
     async def __aenter__(self) -> Self:
         """Enter an async context.
 
-        Start this background service.
+        Start this service.
 
         Returns:
-            This background service.
+            This service.
         """
         self.start()
         return self
@@ -200,7 +200,7 @@ class BackgroundService(abc.ABC):
     ) -> None:
         """Exit an async context.
 
-        Stop this background service.
+        Stop this service.
 
         Args:
             exc_type: The type of the exception raised, if any.
@@ -210,9 +210,9 @@ class BackgroundService(abc.ABC):
         await self.stop()
 
     async def wait(self) -> None:
-        """Wait this background service to finish.
+        """Wait for this service to finish.
 
-        Wait until all background service tasks are finished.
+        Wait until all the service tasks are finished.
 
         Raises:
             BaseExceptionGroup: If any of the tasks spawned by this service raised an
@@ -239,13 +239,13 @@ class BackgroundService(abc.ABC):
                     exceptions.append(error)
             if exceptions:
                 raise BaseExceptionGroup(
-                    f"Error while stopping background service {self}", exceptions
+                    f"Error while stopping service {self}", exceptions
                 )
 
     def __await__(self) -> collections.abc.Generator[None, None, None]:
-        """Await this background service.
+        """Await this service.
 
-        An awaited background service will wait for all its tasks to finish.
+        An awaited service will wait for all its tasks to finish.
 
         Returns:
             An implementation-specific generator for the awaitable.
@@ -255,7 +255,7 @@ class BackgroundService(abc.ABC):
     def __del__(self) -> None:
         """Destroy this instance.
 
-        Cancel all running tasks spawned by this background service.
+        Cancel all running tasks spawned by this service.
         """
         self.cancel("{self!r} was deleted")
 
