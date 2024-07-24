@@ -55,6 +55,14 @@
       - "examples/**"
       - LICENSE
 
+"part:logging":
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/frequenz/core/logging.py"
+      - "src/frequenz/core/logging/**"
+      - "tests/test_logging.py"
+      - "tests/logging/**"
+
 "part:math":
   - changed-files:
     - any-glob-to-any-file:
