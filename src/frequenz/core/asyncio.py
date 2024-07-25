@@ -12,14 +12,51 @@ The module provides the following classes and functions:
   task and waits for it to finish, handling `CancelledError` exceptions.
 - [Service][frequenz.core.asyncio.Service]: A base class for
   implementing services running in the background that can be started and stopped.
+- [TaskCreator][frequenz.core.asyncio.TaskCreator]: A protocol for creating tasks.
 """
 
 
 import abc
 import asyncio
 import collections.abc
+import contextvars
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Protocol, Self, TypeVar, runtime_checkable
+
+TaskReturnT = TypeVar("TaskReturnT")
+"""The type of the return value of a task."""
+
+
+@runtime_checkable
+class TaskCreator(Protocol):
+    """A protocol for creating tasks.
+
+    Built-in asyncio functions and classes implementing this protocol:
+
+    - [`asyncio`][]
+    - [`asyncio.AbstractEventLoop`][] (returned by [`asyncio.get_event_loop`][] for
+      example)
+    - [`asyncio.TaskGroup`][]
+    """
+
+    def create_task(
+        self,
+        coro: collections.abc.Coroutine[Any, Any, TaskReturnT],
+        *,
+        name: str | None = None,
+        context: contextvars.Context | None = None,
+    ) -> asyncio.Task[TaskReturnT]:
+        """Create a task.
+
+        Args:
+            coro: The coroutine to be executed.
+            name: The name of the task.
+            context: The context to be used for the task.
+
+        Returns:
+            The new task.
+        """
+        ...  # pylint: disable=unnecessary-ellipsis
 
 
 async def cancel_and_await(task: asyncio.Task[Any]) -> None:
