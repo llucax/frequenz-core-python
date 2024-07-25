@@ -17,6 +17,7 @@ The module provides the following classes and functions:
 - [TaskCreator][frequenz.core.asyncio.TaskCreator]: A protocol for creating tasks.
 """
 
+from __future__ import annotations
 
 import abc
 import asyncio
@@ -67,23 +68,146 @@ class TaskCreator(Protocol):
         ...  # pylint: disable=unnecessary-ellipsis
 
 
-async def cancel_and_await(task: asyncio.Task[Any]) -> None:
-    """Cancel a task and wait for it to finish.
+class ServiceNursery:
 
-    Exits immediately if the task is already done.
+    def __init__(self, task_creator: TaskCreator = asyncio) -> None:
+        """Initialize this nursery."""
+        self._task_creator: TaskCreator = task_creator
+        self._services: set[Service] = set()
+        self._tasks: set[asyncio.Task[Any]] = set()
 
-    The `CancelledError` is suppressed, but any other exception will be propagated.
+    def manage_service(self, service: Service) -> None:
+        """Start managing a service.
 
-    Args:
-        task: The task to be cancelled and waited for.
-    """
-    if task.done():
-        return
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+        Args:
+            service: The service to be managed.
+        """
+        self._services.add(service)
+
+    def create_task(
+        self,
+        coro: collections.abc.Coroutine[Any, Any, T],
+        *,
+        name: str | None = None,
+        context: contextvars.Context | None = None,
+    ) -> asyncio.Task[T]:
+        """Start a managed task.
+
+        Args:
+            coro: The coroutine to be managed.
+            name: The name of the task.
+            context: The context to be used for the task.
+
+        Returns:
+            The new task.
+        """
+        task = self._task_creator.create_task(coro, name=name, context=context)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
+
+    async def __aenter__(self) -> Self:
+        """Enter an async context.
+
+        All services managed by this nursery are started.
+
+        Returns:
+            This nursery.
+        """
+        for service in self._services:
+            service.start()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
+        """Exit an async context.
+
+        Args:
+            exc_type: The type of the exception raised, if any.
+            exc_val: The exception raised, if any.
+            exc_tb: The traceback of the exception raised, if any.
+
+        Returns:
+            Whether the exception was handled.
+        """
+        # wait for completion and restart
+        return await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+
+    def __await__(self) -> collections.abc.Generator[None, None, None]:
+        """Await this service.
+
+        An awaited service will wait for all its tasks to finish.
+
+        Returns:
+            An implementation-specific generator for the awaitable.
+        """
+
+        async def _wait() -> None:
+            """Wait for this service to finish.
+
+            Wait until all the service tasks are finished.
+
+            Raises:
+                BaseExceptionGroup: If any of the tasks spawned by this service raised an
+                    exception (`CancelError` is not considered an error and not returned in
+                    the exception group).
+            """
+            # We need to account for tasks that were created between when we started
+            # awaiting and we finished awaiting.
+            while self._awaitables:
+                done, pending = await asyncio.wait(self._awaitables)
+                assert not pending
+
+                # We remove the done tasks, but there might be new ones created after we
+                # started waiting.
+                self._tasks = self._tasks - done
+
+                exceptions: list[BaseException] = []
+                for task in done:
+                    try:
+                        # This will raise a CancelledError if the task was cancelled or any
+                        # other exception if the task raised one.
+                        _ = task.result()
+                    except BaseException as error:  # pylint: disable=broad-except
+                        exceptions.append(error)
+                if exceptions:
+                    raise BaseExceptionGroup(
+                        f"Error while stopping service {self}", exceptions
+                    )
+
+        return _wait().__await__()
+
+    async def __aenter__(self) -> Self:
+        """Enter an async context.
+
+        Start this service.
+
+        Returns:
+            This service.
+        """
+        self.start()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Exit an async context.
+
+        Stop this service.
+
+        Args:
+            exc_type: The type of the exception raised, if any.
+            exc_val: The exception raised, if any.
+            exc_tb: The traceback of the exception raised, if any.
+        """
+        await self.stop()
 
 
 class Service(abc.ABC):
@@ -262,11 +386,17 @@ class ServiceBase(Service, abc.ABC):
     """
 
     def __init__(
-        self, *, unique_id: str | None = None, task_creator: TaskCreator = asyncio
+        self,
+        *,
+        manager: ServiceNursery | None,
+        unique_id: str | None = None,
+        task_creator: TaskCreator = asyncio,
     ) -> None:
         """Initialize this Service.
 
         Args:
+            manager: The service manager to which this service belongs. If `None`, the
+                service will not be managed by any manager.
             unique_id: The string to uniquely identify this service instance.
                 If `None`, a string based on `hex(id(self))` will be used. This is
                 used in `__repr__` and `__str__` methods, mainly for debugging
@@ -278,13 +408,16 @@ class ServiceBase(Service, abc.ABC):
         # [2:] is used to remove the '0x' prefix from the hex representation of the id,
         # as it doesn't add any uniqueness to the string.
         self._unique_id: str = hex(id(self))[2:] if unique_id is None else unique_id
-        self._tasks: set[asyncio.Task[Any]] = set()
         self._task_creator: TaskCreator = task_creator
+        self._tasks: set[asyncio.Task[Any]] = set()
+        if manager:
+            manager.manage_service(self)
 
     @override
     @abc.abstractmethod
     def start(self) -> None:
         """Start this service."""
+        self._task_creator.create_task(self._run(), name=f"{self}:_run")
 
     @property
     @override
@@ -305,6 +438,62 @@ class ServiceBase(Service, abc.ABC):
             unless the class explicitly documents it is safe to do so.
         """
         return self._tasks
+
+    def create_task(
+        self,
+        coro: collections.abc.Coroutine[Any, Any, T],
+        *,
+        name: str | None = None,
+        context: contextvars.Context | None = None,
+        log_exceptions: bool = True,
+    ) -> asyncio.Task[T]:
+        """Start a managed task as part of the service.
+
+        Args:
+            coro: The coroutine to be managed.
+            name: The name of the task.
+            context: The context to be used for the task.
+            log_exceptions: Whether to log exceptions raised by the task.
+
+        Returns:
+            The newly created task.
+        """
+
+        async def _wrap_coro() -> T:
+            try:
+                return await coro
+            except asyncio.CancelledError:
+                _logger.debug("%s: Task %r was cancelled", self, name)
+                raise
+            except BaseException as exc:
+                _logger.exception(
+                    "%s: Task %r stopped because of an unhandled exception: %s",
+                    self,
+                    name,
+                    exc,
+                )
+                raise
+
+        task = self._task_creator.create_task(
+            _wrap_coro() if log_exceptions else coro, name=name, context=context
+        )
+        self._tasks.add(task)
+        return task
+
+    async def _run(self) -> None:
+        try:
+            await self.run()
+        except asyncio.CancelledError:
+            # We don't want to propagate the CancelledError as it is expected when
+            # stopping the service.
+            pass
+        except BaseException as exc:
+            _logger.exception(f"Error while running service {self!r}", exc_info=exc)
+            raise
+
+    @abc.abstractmethod
+    async def run(self) -> None:
+        """Start this service."""
 
     @property
     @override
@@ -507,3 +696,22 @@ class ServiceBase(Service, abc.ABC):
             A string representation of this instance.
         """
         return f"{type(self).__name__}[{self._unique_id}]"
+
+
+async def cancel_and_await(task: asyncio.Task[Any]) -> None:
+    """Cancel a task and wait for it to finish.
+
+    Exits immediately if the task is already done.
+
+    The `CancelledError` is suppressed, but any other exception will be propagated.
+
+    Args:
+        task: The task to be cancelled and waited for.
+    """
+    if task.done():
+        return
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
