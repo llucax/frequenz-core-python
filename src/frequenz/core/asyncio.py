@@ -101,10 +101,10 @@ class Service(abc.ABC):
     implementation does not collect any results and re-raises all exceptions.
 
     Warning:
-        As services manage [`asyncio.Task`][] objects, a reference to them must be held
-        for as long as the service is expected to be running, otherwise its tasks will
-        be cancelled and the service will stop. For more information, please refer to
-        the [Python `asyncio`
+        As services manage [`asyncio.Task`][] objects, a reference to a running service
+        must be held for as long as the service is expected to be running. Otherwise, its
+        tasks will be cancelled and the service will stop. For more information, please
+        refer to the [Python `asyncio`
         documentation](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task).
 
     Example:
