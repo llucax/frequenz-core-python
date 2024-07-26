@@ -9,7 +9,7 @@ from typing import Literal, assert_never
 import async_solipsism
 import pytest
 
-from frequenz.core.asyncio import Service, TaskCreator
+from frequenz.core.asyncio import ServiceBase, TaskCreator
 
 
 # This method replaces the event loop for all tests in the file.
@@ -19,7 +19,7 @@ def event_loop_policy() -> async_solipsism.EventLoopPolicy:
     return async_solipsism.EventLoopPolicy()
 
 
-class FakeService(Service):
+class FakeService(ServiceBase):
     """A service that does nothing."""
 
     def __init__(

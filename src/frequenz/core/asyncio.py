@@ -10,8 +10,10 @@ The module provides the following classes and functions:
 
 - [cancel_and_await][frequenz.core.asyncio.cancel_and_await]: A function that cancels a
   task and waits for it to finish, handling `CancelledError` exceptions.
-- [Service][frequenz.core.asyncio.Service]: A base class for
-  implementing services running in the background that can be started and stopped.
+- [Service][frequenz.core.asyncio.Service]: An interface for services running in the
+  background.
+- [ServiceBase][frequenz.core.asyncio.ServiceBase]: A base class for implementing
+  services running in the background.
 - [TaskCreator][frequenz.core.asyncio.TaskCreator]: A protocol for creating tasks.
 """
 
@@ -23,6 +25,8 @@ import contextvars
 import logging
 from types import TracebackType
 from typing import Any, Protocol, Self, TypeVar, runtime_checkable
+
+from typing_extensions import override
 
 _logger = logging.getLogger(__name__)
 
@@ -90,16 +94,6 @@ class Service(abc.ABC):
     [stopped][frequenz.core.asyncio.Service.stop] and can work as an async context
     manager to provide deterministic cleanup.
 
-    To implement a service, subclasses must implement the
-    [`start()`][frequenz.core.asyncio.Service.start] method, which should start the
-    background tasks needed by the service using the
-    [`create_task()`][frequezn.core.asyncio.Service.create_task] method.
-
-    If you need to collect results or handle exceptions of the tasks when stopping the
-    service, then you need to also override the
-    [`stop()`][frequenz.core.asyncio.Service.stop] method, as the base
-    implementation does not collect any results and re-raises all exceptions.
-
     Warning:
         As services manage [`asyncio.Task`][] objects, a reference to a running service
         must be held for as long as the service is expected to be running. Otherwise, its
@@ -109,10 +103,135 @@ class Service(abc.ABC):
 
     Example:
         ```python
+        async def as_context_manager(service: Service) -> None:
+            async with service:
+                assert service.is_running
+                await asyncio.sleep(5)
+            assert not service.is_running
+
+        async def manual_start_stop(service: Service) -> None:
+            # Use only if necessary, as cleanup is more complicated
+            service.start()
+            await asyncio.sleep(5)
+            await service.stop()
+        ```
+    """
+
+    @abc.abstractmethod
+    def start(self) -> None:
+        """Start this service."""
+
+    @property
+    @abc.abstractmethod
+    def unique_id(self) -> str:
+        """The unique ID of this service."""
+
+    @property
+    @abc.abstractmethod
+    def tasks(self) -> collections.abc.Set[asyncio.Task[Any]]:
+        """The set of running tasks spawned by this service.
+
+        Users typically should not modify the tasks in the returned set and only use
+        them for informational purposes.
+
+        Danger:
+            Changing the returned tasks may lead to unexpected behavior, don't do it
+            unless the class explicitly documents it is safe to do so.
+        """
+
+    @property
+    @abc.abstractmethod
+    def is_running(self) -> bool:
+        """Whether this service is running.
+
+        A service is considered running when at least one task is running.
+        """
+
+    @abc.abstractmethod
+    def cancel(self, msg: str | None = None) -> None:
+        """Cancel all running tasks spawned by this service.
+
+        Args:
+            msg: The message to be passed to the tasks being cancelled.
+        """
+
+    @abc.abstractmethod
+    async def stop(self, msg: str | None = None) -> None:  # noqa: DOC502
+        """Stop this service.
+
+        This method cancels all running tasks spawned by this service and waits for them
+        to finish.
+
+        Args:
+            msg: The message to be passed to the tasks being cancelled.
+
+        Raises:
+            BaseExceptionGroup: If any of the tasks spawned by this service raised an
+                exception.
+        """
+
+    @abc.abstractmethod
+    async def __aenter__(self) -> Self:
+        """Enter an async context.
+
+        Start this service.
+
+        Returns:
+            This service.
+        """
+
+    @abc.abstractmethod
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Exit an async context.
+
+        Stop this service.
+
+        Args:
+            exc_type: The type of the exception raised, if any.
+            exc_val: The exception raised, if any.
+            exc_tb: The traceback of the exception raised, if any.
+        """
+
+    @abc.abstractmethod
+    def __await__(self) -> collections.abc.Generator[None, None, None]:  # noqa: DOC502
+        """Wait for this service to finish.
+
+        Wait until all the service tasks are finished.
+
+        Returns:
+            An implementation-specific generator for the awaitable.
+
+        Raises:
+            BaseExceptionGroup: If any of the tasks spawned by this service raised an
+                exception (`CancelError` is not considered an error and not returned in
+                the exception group).
+        """
+
+
+class ServiceBase(Service, abc.ABC):
+    """A base class for implementing a service running in the background.
+
+    To implement a service, subclasses must implement the
+    [`start()`][frequenz.core.asyncio.ServiceBase.start] method, which should start the
+    background tasks needed by the service using the
+    [`create_task()`][frequenz.core.asyncio.ServiceBase.create_task] method.
+
+    If you need to collect results or handle exceptions of the tasks when stopping the
+    service, then you need to also override the
+    [`stop()`][frequenz.core.asyncio.ServiceBase.stop] method, as the base
+    implementation does not collect any results and re-raises all exceptions.
+
+    Example:
+        ```python
         import datetime
         import asyncio
 
-        class Clock(Service):
+        class Clock(ServiceBase):
             def __init__(self, resolution_s: float, *, unique_id: str | None = None) -> None:
                 super().__init__(unique_id=unique_id)
                 self._resolution_s = resolution_s
@@ -162,16 +281,19 @@ class Service(abc.ABC):
         self._tasks: set[asyncio.Task[Any]] = set()
         self._task_creator: TaskCreator = task_creator
 
+    @override
     @abc.abstractmethod
     def start(self) -> None:
         """Start this service."""
 
     @property
+    @override
     def unique_id(self) -> str:
         """The unique ID of this service."""
         return self._unique_id
 
     @property
+    @override
     def tasks(self) -> collections.abc.Set[asyncio.Task[Any]]:
         """The set of running tasks spawned by this service.
 
@@ -185,6 +307,7 @@ class Service(abc.ABC):
         return self._tasks
 
     @property
+    @override
     def is_running(self) -> bool:
         """Whether this service is running.
 
@@ -205,17 +328,17 @@ class Service(abc.ABC):
         A reference to the task will be held by the service, so there is no need to save
         the task object.
 
-        Tasks can be retrieved via the [`tasks`][frequenz.core.asyncio.Service.tasks]
-        property.
+        Tasks can be retrieved via the
+        [`tasks`][frequenz.core.asyncio.ServiceBase.tasks] property.
 
         Managed tasks always have a `name` including information about the service
         itself. If you need to retrieve the final name of the task you can always do so
         by calling [`.get_name()`][asyncio.Task.get_name] on the returned task.
 
         Tasks created this way will also be automatically cancelled when calling
-        [`cancel()`][frequenz.core.asyncio.Service.cancel] or
-        [`stop()`][frequenz.core.asyncio.Service.stop], or when the service is used as
-        a async context manager.
+        [`cancel()`][frequenz.core.asyncio.ServiceBase.cancel] or
+        [`stop()`][frequenz.core.asyncio.ServiceBase.stop], or when the service is used
+        as a async context manager.
 
         Args:
             coro: The coroutine to be managed.
@@ -250,6 +373,7 @@ class Service(abc.ABC):
             task.add_done_callback(_log_exception)
         return task
 
+    @override
     def cancel(self, msg: str | None = None) -> None:
         """Cancel all running tasks spawned by this service.
 
@@ -259,6 +383,7 @@ class Service(abc.ABC):
         for task in self._tasks:
             task.cancel(msg)
 
+    @override
     async def stop(self, msg: str | None = None) -> None:
         """Stop this service.
 
@@ -286,6 +411,7 @@ class Service(abc.ABC):
                 # add the exceptions we just filtered by adding a from clause here.
                 raise rest  # pylint: disable=raise-missing-from
 
+    @override
     async def __aenter__(self) -> Self:
         """Enter an async context.
 
@@ -297,6 +423,7 @@ class Service(abc.ABC):
         self.start()
         return self
 
+    @override
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
@@ -347,6 +474,7 @@ class Service(abc.ABC):
                     f"Error while stopping service {self}", exceptions
                 )
 
+    @override
     def __await__(self) -> collections.abc.Generator[None, None, None]:
         """Await this service.
 
