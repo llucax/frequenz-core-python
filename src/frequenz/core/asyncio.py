@@ -20,8 +20,12 @@ import abc
 import asyncio
 import collections.abc
 import contextvars
+import logging
 from types import TracebackType
 from typing import Any, Protocol, Self, TypeVar, runtime_checkable
+
+_logger = logging.getLogger(__name__)
+
 
 TaskReturnT = TypeVar("TaskReturnT")
 """The type of the return value of a task."""
@@ -194,6 +198,7 @@ class Service(abc.ABC):
         *,
         name: str | None = None,
         context: contextvars.Context | None = None,
+        log_exception: bool = True,
     ) -> asyncio.Task[TaskReturnT]:
         """Start a managed task.
 
@@ -212,6 +217,7 @@ class Service(abc.ABC):
             coro: The coroutine to be managed.
             name: The name of the task.
             context: The context to be used for the task.
+            log_exception: Whether to log exceptions raised by the task.
 
         Returns:
             The new task.
@@ -219,6 +225,18 @@ class Service(abc.ABC):
         task = self._task_creator.create_task(coro, name=name, context=context)
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+
+        if log_exception:
+
+            def _log_exception(task: asyncio.Task[TaskReturnT]) -> None:
+                try:
+                    task.result()
+                except asyncio.CancelledError:
+                    pass
+                except BaseException:  # pylint: disable=broad-except
+                    _logger.exception("%s: Task %r raised an exception", self, task)
+
+            task.add_done_callback(_log_exception)
         return task
 
     def cancel(self, msg: str | None = None) -> None:
