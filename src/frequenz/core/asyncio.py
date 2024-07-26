@@ -208,6 +208,10 @@ class Service(abc.ABC):
         Tasks can be retrieved via the [`tasks`][frequenz.core.asyncio.Service.tasks]
         property.
 
+        Managed tasks always have a `name` including information about the service
+        itself. If you need to retrieve the final name of the task you can always do so
+        by calling [`.get_name()`][asyncio.Task.get_name] on the returned task.
+
         Tasks created this way will also be automatically cancelled when calling
         [`cancel()`][frequenz.core.asyncio.Service.cancel] or
         [`stop()`][frequenz.core.asyncio.Service.stop], or when the service is used as
@@ -215,14 +219,21 @@ class Service(abc.ABC):
 
         Args:
             coro: The coroutine to be managed.
-            name: The name of the task.
+            name: The name of the task. Names will always have the form
+                `f"{self}:{name}"`. If `None` or empty, the default name will be
+                `hex(id(coro))[2:]`. If you need the final name of the task, it can
+                always be retrieved
             context: The context to be used for the task.
             log_exception: Whether to log exceptions raised by the task.
 
         Returns:
             The new task.
         """
-        task = self._task_creator.create_task(coro, name=name, context=context)
+        if not name:
+            name = hex(id(coro))[2:]
+        task = self._task_creator.create_task(
+            coro, name=f"{self}:{name}", context=context
+        )
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
