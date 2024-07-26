@@ -88,8 +88,8 @@ class Service(abc.ABC):
 
     To implement a service, subclasses must implement the
     [`start()`][frequenz.core.asyncio.Service.start] method, which should start the
-    background tasks needed by the service, and add them to the `_tasks` protected
-    attribute.
+    background tasks needed by the service using the
+    [`create_task()`][frequezn.core.asyncio.Service.create_task] method.
 
     If you need to collect results or handle exceptions of the tasks when stopping the
     service, then you need to also override the
@@ -114,7 +114,9 @@ class Service(abc.ABC):
                 self._resolution_s = resolution_s
 
             def start(self) -> None:
-                self._tasks.add(asyncio.create_task(self._tick()))
+                # Managed tasks are automatically saved, so there is no need to hold a
+                # reference to them if you don't need to further interact with them.
+                self.create_task(self._tick())
 
             async def _tick(self) -> None:
                 while True:
@@ -136,7 +138,9 @@ class Service(abc.ABC):
         ```
     """
 
-    def __init__(self, *, unique_id: str | None = None) -> None:
+    def __init__(
+        self, *, unique_id: str | None = None, task_creator: TaskCreator = asyncio
+    ) -> None:
         """Initialize this Service.
 
         Args:
@@ -144,11 +148,15 @@ class Service(abc.ABC):
                 If `None`, a string based on `hex(id(self))` will be used. This is
                 used in `__repr__` and `__str__` methods, mainly for debugging
                 purposes, to identify a particular instance of a service.
+            task_creator: The object that will be used to create tasks. Usually one of:
+                the [`asyncio`]() module, an [`asyncio.AbstractEventLoop`]() or
+                an [`asyncio.TaskGroup`]().
         """
         # [2:] is used to remove the '0x' prefix from the hex representation of the id,
         # as it doesn't add any uniqueness to the string.
         self._unique_id: str = hex(id(self))[2:] if unique_id is None else unique_id
         self._tasks: set[asyncio.Task[Any]] = set()
+        self._task_creator: TaskCreator = task_creator
 
     @abc.abstractmethod
     def start(self) -> None:
@@ -179,6 +187,39 @@ class Service(abc.ABC):
         A service is considered running when at least one task is running.
         """
         return any(not task.done() for task in self._tasks)
+
+    def create_task(
+        self,
+        coro: collections.abc.Coroutine[Any, Any, TaskReturnT],
+        *,
+        name: str | None = None,
+        context: contextvars.Context | None = None,
+    ) -> asyncio.Task[TaskReturnT]:
+        """Start a managed task.
+
+        A reference to the task will be held by the service, so there is no need to save
+        the task object.
+
+        Tasks can be retrieved via the [`tasks`][frequenz.core.asyncio.Service.tasks]
+        property.
+
+        Tasks created this way will also be automatically cancelled when calling
+        [`cancel()`][frequenz.core.asyncio.Service.cancel] or
+        [`stop()`][frequenz.core.asyncio.Service.stop], or when the service is used as
+        a async context manager.
+
+        Args:
+            coro: The coroutine to be managed.
+            name: The name of the task.
+            context: The context to be used for the task.
+
+        Returns:
+            The new task.
+        """
+        task = self._task_creator.create_task(coro, name=name, context=context)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
 
     def cancel(self, msg: str | None = None) -> None:
         """Cancel all running tasks spawned by this service.
