@@ -110,9 +110,9 @@ async def test_start_stop() -> None:
     assert fake_service.is_running is False
 
 
-@pytest.mark.parametrize("method", ["await", "wait", "stop"])
+@pytest.mark.parametrize("method", ["await", "stop"])
 async def test_start_and_crash(
-    method: Literal["await"] | Literal["wait"] | Literal["stop"],
+    method: Literal["await"] | Literal["stop"],
 ) -> None:
     """Test a service reports when crashing."""
     exc = RuntimeError("error")
@@ -125,8 +125,6 @@ async def test_start_and_crash(
         match method:
             case "await":
                 await fake_service
-            case "wait":
-                await fake_service.wait()
             case "stop":
                 # Give the service some time to run and crash, otherwise stop() will
                 # cancel it before it has a chance to crash

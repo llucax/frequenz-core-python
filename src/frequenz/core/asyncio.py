@@ -401,7 +401,7 @@ class ServiceBase(Service, abc.ABC):
             return
         self.cancel(msg)
         try:
-            await self.wait()
+            await self
         except BaseExceptionGroup as exc_group:
             # We want to ignore CancelledError here as we explicitly cancelled all the
             # tasks.
@@ -441,7 +441,7 @@ class ServiceBase(Service, abc.ABC):
         """
         await self.stop()
 
-    async def wait(self) -> None:
+    async def _wait(self) -> None:
         """Wait for this service to finish.
 
         Wait until all the service tasks are finished.
@@ -483,7 +483,7 @@ class ServiceBase(Service, abc.ABC):
         Returns:
             An implementation-specific generator for the awaitable.
         """
-        return self.wait().__await__()
+        return self._wait().__await__()
 
     def __del__(self) -> None:
         """Destroy this instance.
