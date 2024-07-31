@@ -505,7 +505,7 @@ class ServiceBase(Service, abc.ABC):
         Returns:
             A string representation of this instance.
         """
-        return f"{type(self).__name__}(unique_id={self._unique_id!r}, tasks={self._tasks!r})"
+        return f"{type(self).__name__}<{self._unique_id} tasks={self._tasks!r}>"
 
     def __str__(self) -> str:
         """Return a string representation of this instance.
