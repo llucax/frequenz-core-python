@@ -186,7 +186,7 @@ class Service(abc.ABC):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
+    ) -> bool | None:
         """Exit an async context.
 
         Stop this service.
@@ -195,6 +195,9 @@ class Service(abc.ABC):
             exc_type: The type of the exception raised, if any.
             exc_val: The exception raised, if any.
             exc_tb: The traceback of the exception raised, if any.
+
+        Returns:
+            Whether the exception was handled.
         """
 
     @abc.abstractmethod
@@ -429,7 +432,7 @@ class ServiceBase(Service, abc.ABC):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
+    ) -> bool | None:
         """Exit an async context.
 
         Stop this service.
@@ -438,8 +441,12 @@ class ServiceBase(Service, abc.ABC):
             exc_type: The type of the exception raised, if any.
             exc_val: The exception raised, if any.
             exc_tb: The traceback of the exception raised, if any.
+
+        Returns:
+            Whether the exception was handled.
         """
         await self.stop()
+        return None
 
     async def _wait(self) -> None:
         """Wait for this service to finish.
