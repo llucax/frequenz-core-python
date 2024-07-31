@@ -52,7 +52,7 @@ async def test_construction_defaults() -> None:
     assert fake_service.unique_id == hex(id(fake_service))[2:]
     assert fake_service.tasks == set()
     assert fake_service.is_running is False
-    assert str(fake_service) == f"FakeService[{fake_service.unique_id}]"
+    assert str(fake_service) == f"FakeService:{fake_service.unique_id}"
     assert repr(fake_service) == f"FakeService<{fake_service.unique_id} tasks=set()>"
 
 

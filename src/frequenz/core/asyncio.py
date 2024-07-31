@@ -513,4 +513,4 @@ class ServiceBase(Service, abc.ABC):
         Returns:
             A string representation of this instance.
         """
-        return f"{type(self).__name__}[{self._unique_id}]"
+        return f"{type(self).__name__}:{self._unique_id}"
