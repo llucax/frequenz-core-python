@@ -1,7 +1,7 @@
 # License: MIT
 # Copyright © 2022 Frequenz Energy-as-a-Service GmbH
 
-"""Tests for the asyncio module."""
+"""Tests for the asyncio service module."""
 
 import asyncio
 from typing import Literal, assert_never
@@ -9,7 +9,7 @@ from typing import Literal, assert_never
 import async_solipsism
 import pytest
 
-from frequenz.core.asyncio import ServiceBase, TaskCreator
+from frequenz.core.asyncio import ServiceBase
 
 
 # This method replaces the event loop for all tests in the file.
@@ -147,18 +147,3 @@ async def test_async_context_manager() -> None:
         assert fake_service.is_running is True
 
     assert fake_service.is_running is False
-
-
-def test_task_creator_asyncio() -> None:
-    """Test that the asyncio module is a TaskCreator."""
-    assert isinstance(asyncio, TaskCreator)
-
-
-async def test_task_creator_loop() -> None:
-    """Test that the asyncio event loop is a TaskCreator."""
-    assert isinstance(asyncio.get_event_loop(), TaskCreator)
-
-
-def test_task_creator_task_group() -> None:
-    """Test that the asyncio task group is a TaskCreator."""
-    assert isinstance(asyncio.TaskGroup(), TaskCreator)

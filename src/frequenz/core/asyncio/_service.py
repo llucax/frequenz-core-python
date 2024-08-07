@@ -1,21 +1,7 @@
 # License: MIT
 # Copyright © 2024 Frequenz Energy-as-a-Service GmbH
 
-"""General purpose async tools.
-
-This module provides general purpose async tools that can be used to simplify the
-development of asyncio-based applications.
-
-The module provides the following classes and functions:
-
-- [cancel_and_await][frequenz.core.asyncio.cancel_and_await]: A function that cancels a
-  task and waits for it to finish, handling `CancelledError` exceptions.
-- [Service][frequenz.core.asyncio.Service]: An interface for services running in the
-  background.
-- [ServiceBase][frequenz.core.asyncio.ServiceBase]: A base class for implementing
-  services running in the background.
-- [TaskCreator][frequenz.core.asyncio.TaskCreator]: A protocol for creating tasks.
-"""
+"""Module implementing the `Service` and `ServiceBase` classes."""
 
 
 import abc
@@ -24,66 +10,13 @@ import collections.abc
 import contextvars
 import logging
 from types import TracebackType
-from typing import Any, Protocol, Self, TypeVar, runtime_checkable
+from typing import Any, Self
 
 from typing_extensions import override
 
+from ._util import TaskCreator, TaskReturnT
+
 _logger = logging.getLogger(__name__)
-
-
-TaskReturnT = TypeVar("TaskReturnT")
-"""The type of the return value of a task."""
-
-
-@runtime_checkable
-class TaskCreator(Protocol):
-    """A protocol for creating tasks.
-
-    Built-in asyncio functions and classes implementing this protocol:
-
-    - [`asyncio`][]
-    - [`asyncio.AbstractEventLoop`][] (returned by [`asyncio.get_event_loop`][] for
-      example)
-    - [`asyncio.TaskGroup`][]
-    """
-
-    def create_task(
-        self,
-        coro: collections.abc.Coroutine[Any, Any, TaskReturnT],
-        *,
-        name: str | None = None,
-        context: contextvars.Context | None = None,
-    ) -> asyncio.Task[TaskReturnT]:
-        """Create a task.
-
-        Args:
-            coro: The coroutine to be executed.
-            name: The name of the task.
-            context: The context to be used for the task.
-
-        Returns:
-            The new task.
-        """
-        ...  # pylint: disable=unnecessary-ellipsis
-
-
-async def cancel_and_await(task: asyncio.Task[Any]) -> None:
-    """Cancel a task and wait for it to finish.
-
-    Exits immediately if the task is already done.
-
-    The `CancelledError` is suppressed, but any other exception will be propagated.
-
-    Args:
-        task: The task to be cancelled and waited for.
-    """
-    if task.done():
-        return
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
 
 
 class Service(abc.ABC):
