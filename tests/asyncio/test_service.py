@@ -8,6 +8,7 @@ from typing import Literal, assert_never
 
 import async_solipsism
 import pytest
+from typing_extensions import override
 
 from frequenz.core.asyncio import ServiceBase
 
@@ -34,33 +35,32 @@ class FakeService(ServiceBase):
         self._sleep = sleep
         self._exc = exc
 
-    def start(self) -> None:
-        """Start this service."""
-
-        async def nop() -> None:
-            if self._sleep is not None:
-                await asyncio.sleep(self._sleep)
-            if self._exc is not None:
-                raise self._exc
-
-        self._tasks.add(asyncio.create_task(nop(), name="nop"))
+    @override
+    async def main(self) -> None:
+        """Run this service."""
+        if self._sleep is not None:
+            await asyncio.sleep(self._sleep)
+        if self._exc is not None:
+            raise self._exc
 
 
 async def test_construction_defaults() -> None:
     """Test the construction of a service with default arguments."""
     fake_service = FakeService()
     assert fake_service.unique_id == hex(id(fake_service))[2:]
-    assert fake_service.tasks == set()
+    assert fake_service.task_group.tasks == set()
     assert fake_service.is_running is False
     assert str(fake_service) == f"FakeService:{fake_service.unique_id}"
-    assert repr(fake_service) == f"FakeService<{fake_service.unique_id} tasks=set()>"
+    assert (
+        repr(fake_service) == f"FakeService<{fake_service.unique_id} main not running>"
+    )
 
 
 async def test_construction_custom() -> None:
     """Test the construction of a service with a custom unique ID."""
     fake_service = FakeService(unique_id="test")
     assert fake_service.unique_id == "test"
-    assert fake_service.tasks == set()
+    assert fake_service.task_group.tasks == set()
     assert fake_service.is_running is False
 
 
