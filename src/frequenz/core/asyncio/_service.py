@@ -61,19 +61,6 @@ class Service(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def tasks(self) -> collections.abc.Set[asyncio.Task[Any]]:
-        """The set of running tasks spawned by this service.
-
-        Users typically should not modify the tasks in the returned set and only use
-        them for informational purposes.
-
-        Danger:
-            Changing the returned tasks may lead to unexpected behavior, don't do it
-            unless the class explicitly documents it is safe to do so.
-        """
-
-    @property
-    @abc.abstractmethod
     def is_running(self) -> bool:
         """Whether this service is running.
 
@@ -229,17 +216,8 @@ class ServiceBase(Service, abc.ABC):
         return self._unique_id
 
     @property
-    @override
     def tasks(self) -> collections.abc.Set[asyncio.Task[Any]]:
-        """The set of running tasks spawned by this service.
-
-        Users typically should not modify the tasks in the returned set and only use
-        them for informational purposes.
-
-        Danger:
-            Changing the returned tasks may lead to unexpected behavior, don't do it
-            unless the class explicitly documents it is safe to do so.
-        """
+        """The set of running tasks spawned by this service."""
         return self._tasks
 
     @property
