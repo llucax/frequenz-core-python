@@ -14,7 +14,7 @@ from typing import Any, Self
 from typing_extensions import override
 
 from ._task_group import PersistentTaskGroup
-from ._util import TaskReturnT
+from ._util import TaskReturnT, get_unique_id
 
 
 class Service(abc.ABC):
@@ -235,9 +235,7 @@ class ServiceBase(Service, abc.ABC):
                 used in `__repr__` and `__str__` methods, mainly for debugging
                 purposes, to identify a particular instance of a service.
         """
-        # [2:] is used to remove the '0x' prefix from the hex representation of the id,
-        # as it doesn't add any uniqueness to the string.
-        self._unique_id: str = hex(id(self))[2:] if unique_id is None else unique_id
+        self._unique_id: str = get_unique_id(unique_id, self)
         self._main_task: asyncio.Task[None] | None = None
         self._task_group: PersistentTaskGroup = PersistentTaskGroup(
             unique_id=self._unique_id

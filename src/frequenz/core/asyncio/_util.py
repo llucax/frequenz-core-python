@@ -11,6 +11,22 @@ TaskReturnT = TypeVar("TaskReturnT")
 """The type of the return value of a task."""
 
 
+def get_unique_id(unique_id: str | None, instance: Any) -> str:
+    """Get a unique identifier for an instance.
+
+    If a `unique_id` is provided, it is returned as is. Otherwise, a string based on
+    `hex(id(instance))` is returned.
+
+    Args:
+        unique_id: The unique identifier to use.
+        instance: The instance to get the `id` from if `unique_id` is `None`.
+
+    Returns:
+        A unique identifier for the instance.
+    """
+    return hex(id(instance))[2:] if unique_id is None else unique_id
+
+
 async def cancel_and_await(task: asyncio.Task[Any]) -> None:
     """Cancel a task and wait for it to finish.
 

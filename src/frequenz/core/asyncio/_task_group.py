@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator, Coroutine, Generator, Set
 from types import TracebackType
 from typing import Any, Self
 
-from ._util import TaskReturnT
+from ._util import TaskReturnT, get_unique_id
 
 _logger = logging.getLogger(__name__)
 
@@ -92,9 +92,7 @@ class PersistentTaskGroup:
                 `__repr__` and `__str__` methods, mainly for debugging purposes, to
                 identify a particular instance of a persistent task group.
         """
-        # [2:] is used to remove the '0x' prefix from the hex representation of the id,
-        # as it doesn't add any uniqueness to the string.
-        self._unique_id: str = hex(id(self))[2:] if unique_id is None else unique_id
+        self._unique_id: str = get_unique_id(unique_id, self)
         """The unique ID of this instance."""
 
         self._running: set[asyncio.Task[Any]] = set()
