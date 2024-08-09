@@ -49,8 +49,15 @@ class Service(abc.ABC):
     """
 
     @abc.abstractmethod
-    def start(self) -> None:
-        """Start this service."""
+    def start(self) -> bool:
+        """Start this service.
+
+        Does nothing if the service is already running or it is stopped but not awaited
+        on yet.
+
+        Returns:
+            Whether the service was started.
+        """
 
     @property
     @abc.abstractmethod
@@ -118,7 +125,8 @@ class Service(abc.ABC):
     def __await__(self) -> collections.abc.Generator[None, None, None]:  # noqa: DOC502
         """Wait for this service to finish.
 
-        Wait until all the service tasks are finished.
+        An awaited service will wait for all its tasks to finish and reset the service
+        so it can be started again.
 
         Returns:
             An implementation-specific generator for the awaitable.
@@ -242,6 +250,15 @@ class ServiceBase(Service, abc.ABC):
         return self._unique_id
 
     @property
+    def main_task(self) -> asyncio.Task[None] | None:
+        """The main task of this service.
+
+        If the service never started, this will be `None`. But if it started and
+        stopped, the stopped task will be returned so it can be further inspected.
+        """
+        return self._main_task
+
+    @property
     def task_group(self) -> PersistentTaskGroup:
         """The task group managing the tasks of this service."""
         return self._task_group
@@ -251,11 +268,19 @@ class ServiceBase(Service, abc.ABC):
         """Execute the service logic."""
 
     @override
-    def start(self) -> None:
-        """Start this service."""
-        if self.is_running:
-            return
+    def start(self) -> bool:
+        """Start this service.
+
+        Does nothing if the service is already running or it is stopped but not awaited
+        on yet.
+
+        Returns:
+            Whether the service was started.
+        """
+        if self._main_task is not None:
+            return False
         self._main_task = asyncio.create_task(self.main(), name=str(self))
+        return True
 
     @property
     @override
@@ -383,7 +408,7 @@ class ServiceBase(Service, abc.ABC):
     async def _wait(self) -> None:
         """Wait for this service to finish.
 
-        Wait until all the service tasks are finished.
+        Wait until all the service tasks are finished and clear the main task.
 
         Raises:
             BaseExceptionGroup: If any of the tasks spawned by this service raised an
@@ -397,6 +422,7 @@ class ServiceBase(Service, abc.ABC):
                 await self._main_task
             except BaseException as error:  # pylint: disable=broad-except
                 exceptions.append(error)
+        self._main_task = None
 
         try:
             await self._task_group
@@ -410,7 +436,8 @@ class ServiceBase(Service, abc.ABC):
     def __await__(self) -> collections.abc.Generator[None, None, None]:
         """Await this service.
 
-        An awaited service will wait for all its tasks to finish.
+        An awaited service will wait for all its tasks to finish and reset the main
+        task so that the service can be started again.
 
         Returns:
             An implementation-specific generator for the awaitable.
