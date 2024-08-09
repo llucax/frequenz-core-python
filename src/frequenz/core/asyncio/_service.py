@@ -1,89 +1,20 @@
 # License: MIT
 # Copyright © 2024 Frequenz Energy-as-a-Service GmbH
 
-"""General purpose async tools.
-
-This module provides general purpose async tools that can be used to simplify the
-development of asyncio-based applications.
-
-The module provides the following classes and functions:
-
-- [cancel_and_await][frequenz.core.asyncio.cancel_and_await]: A function that cancels a
-  task and waits for it to finish, handling `CancelledError` exceptions.
-- [Service][frequenz.core.asyncio.Service]: An interface for services running in the
-  background.
-- [ServiceBase][frequenz.core.asyncio.ServiceBase]: A base class for implementing
-  services running in the background.
-- [TaskCreator][frequenz.core.asyncio.TaskCreator]: A protocol for creating tasks.
-"""
+"""Module implementing the `Service` and `ServiceBase` classes."""
 
 
 import abc
 import asyncio
 import collections.abc
 import contextvars
-import logging
 from types import TracebackType
-from typing import Any, Protocol, Self, TypeVar, runtime_checkable
+from typing import Any, Self
 
 from typing_extensions import override
 
-_logger = logging.getLogger(__name__)
-
-
-TaskReturnT = TypeVar("TaskReturnT")
-"""The type of the return value of a task."""
-
-
-@runtime_checkable
-class TaskCreator(Protocol):
-    """A protocol for creating tasks.
-
-    Built-in asyncio functions and classes implementing this protocol:
-
-    - [`asyncio`][]
-    - [`asyncio.AbstractEventLoop`][] (returned by [`asyncio.get_event_loop`][] for
-      example)
-    - [`asyncio.TaskGroup`][]
-    """
-
-    def create_task(
-        self,
-        coro: collections.abc.Coroutine[Any, Any, TaskReturnT],
-        *,
-        name: str | None = None,
-        context: contextvars.Context | None = None,
-    ) -> asyncio.Task[TaskReturnT]:
-        """Create a task.
-
-        Args:
-            coro: The coroutine to be executed.
-            name: The name of the task.
-            context: The context to be used for the task.
-
-        Returns:
-            The new task.
-        """
-        ...  # pylint: disable=unnecessary-ellipsis
-
-
-async def cancel_and_await(task: asyncio.Task[Any]) -> None:
-    """Cancel a task and wait for it to finish.
-
-    Exits immediately if the task is already done.
-
-    The `CancelledError` is suppressed, but any other exception will be propagated.
-
-    Args:
-        task: The task to be cancelled and waited for.
-    """
-    if task.done():
-        return
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+from ._task_group import PersistentTaskGroup
+from ._util import TaskCreator, TaskReturnT
 
 
 class Service(abc.ABC):
@@ -128,28 +59,12 @@ class Service(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def tasks(self) -> collections.abc.Set[asyncio.Task[Any]]:
-        """The set of running tasks spawned by this service.
-
-        Users typically should not modify the tasks in the returned set and only use
-        them for informational purposes.
-
-        Danger:
-            Changing the returned tasks may lead to unexpected behavior, don't do it
-            unless the class explicitly documents it is safe to do so.
-        """
-
-    @property
-    @abc.abstractmethod
     def is_running(self) -> bool:
-        """Whether this service is running.
-
-        A service is considered running when at least one task is running.
-        """
+        """Whether this service is running."""
 
     @abc.abstractmethod
     def cancel(self, msg: str | None = None) -> None:
-        """Cancel all running tasks spawned by this service.
+        """Cancel this service.
 
         Args:
             msg: The message to be passed to the tasks being cancelled.
@@ -159,8 +74,7 @@ class Service(abc.ABC):
     async def stop(self, msg: str | None = None) -> None:  # noqa: DOC502
         """Stop this service.
 
-        This method cancels all running tasks spawned by this service and waits for them
-        to finish.
+        This method cancels the service and waits for it to finish.
 
         Args:
             msg: The message to be passed to the tasks being cancelled.
@@ -186,7 +100,7 @@ class Service(abc.ABC):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
+    ) -> bool | None:
         """Exit an async context.
 
         Stop this service.
@@ -195,6 +109,9 @@ class Service(abc.ABC):
             exc_type: The type of the exception raised, if any.
             exc_val: The exception raised, if any.
             exc_tb: The traceback of the exception raised, if any.
+
+        Returns:
+            Whether the exception was handled.
         """
 
     @abc.abstractmethod
@@ -226,22 +143,19 @@ class ServiceBase(Service, abc.ABC):
     [`stop()`][frequenz.core.asyncio.ServiceBase.stop] method, as the base
     implementation does not collect any results and re-raises all exceptions.
 
-    Example:
+    Example: Simple single-task example
         ```python
         import datetime
         import asyncio
+        from typing_extensions import override
 
         class Clock(ServiceBase):
             def __init__(self, resolution_s: float, *, unique_id: str | None = None) -> None:
                 super().__init__(unique_id=unique_id)
                 self._resolution_s = resolution_s
 
-            def start(self) -> None:
-                # Managed tasks are automatically saved, so there is no need to hold a
-                # reference to them if you don't need to further interact with them.
-                self.create_task(self._tick())
-
-            async def _tick(self) -> None:
+            @override
+            async def main(self) -> None:
                 while True:
                     await asyncio.sleep(self._resolution_s)
                     print(datetime.datetime.now())
@@ -259,6 +173,49 @@ class ServiceBase(Service, abc.ABC):
 
         asyncio.run(main())
         ```
+
+    Example: Multi-tasks example
+        ```python
+        import asyncio
+        import datetime
+        from typing_extensions import override
+
+        class MultiTaskService(ServiceBase):
+
+            async def _print_every(self, *, seconds: float) -> None:
+                while True:
+                    await asyncio.sleep(seconds)
+                    print(datetime.datetime.now())
+
+            async def _fail_after(self, *, seconds: float) -> None:
+                await asyncio.sleep(seconds)
+                raise ValueError("I failed")
+
+            @override
+            async def main(self) -> None:
+                self.create_task(self._print_every(seconds=1), name="print_1")
+                self.create_task(self._print_every(seconds=11), name="print_11")
+                failing = self.create_task(self._fail_after(seconds=5), name=f"fail_5")
+
+                async for task in self.task_group.as_completed():
+                    assert task.done()  # For demonstration purposes only
+                    try:
+                        task.result()
+                    except ValueError as error:
+                        if failing == task:
+                            failing = self.create_task(
+                                self._fail_after(seconds=5), name=f"fail_5"
+                            )
+                        else:
+                            raise
+
+        async def main() -> None:
+            async with MultiTaskService():
+                await asyncio.sleep(11)
+
+        asyncio.run(main())
+        ```
+
     """
 
     def __init__(
@@ -278,13 +235,10 @@ class ServiceBase(Service, abc.ABC):
         # [2:] is used to remove the '0x' prefix from the hex representation of the id,
         # as it doesn't add any uniqueness to the string.
         self._unique_id: str = hex(id(self))[2:] if unique_id is None else unique_id
-        self._tasks: set[asyncio.Task[Any]] = set()
-        self._task_creator: TaskCreator = task_creator
-
-    @override
-    @abc.abstractmethod
-    def start(self) -> None:
-        """Start this service."""
+        self._main_task: asyncio.Task[None] | None = None
+        self._task_group: PersistentTaskGroup = PersistentTaskGroup(
+            unique_id=self._unique_id, task_creator=task_creator
+        )
 
     @property
     @override
@@ -293,18 +247,22 @@ class ServiceBase(Service, abc.ABC):
         return self._unique_id
 
     @property
+    def task_group(self) -> PersistentTaskGroup:
+        """The task group managing the tasks of this service."""
+        return self._task_group
+
+    @abc.abstractmethod
+    async def main(self) -> None:
+        """Execute the service logic."""
+
     @override
-    def tasks(self) -> collections.abc.Set[asyncio.Task[Any]]:
-        """The set of running tasks spawned by this service.
-
-        Users typically should not modify the tasks in the returned set and only use
-        them for informational purposes.
-
-        Danger:
-            Changing the returned tasks may lead to unexpected behavior, don't do it
-            unless the class explicitly documents it is safe to do so.
-        """
-        return self._tasks
+    def start(self) -> None:
+        """Start this service."""
+        if self.is_running:
+            return
+        self._main_task = self._task_group.task_creator.create_task(
+            self.main(), name=str(self)
+        )
 
     @property
     @override
@@ -313,7 +271,7 @@ class ServiceBase(Service, abc.ABC):
 
         A service is considered running when at least one task is running.
         """
-        return any(not task.done() for task in self._tasks)
+        return self._main_task is not None and not self._main_task.done()
 
     def create_task(
         self,
@@ -328,8 +286,8 @@ class ServiceBase(Service, abc.ABC):
         A reference to the task will be held by the service, so there is no need to save
         the task object.
 
-        Tasks can be retrieved via the
-        [`tasks`][frequenz.core.asyncio.ServiceBase.tasks] property.
+        Tasks are created using the
+        [`task_group`][frequenz.core.asyncio.ServiceBase.task_group].
 
         Managed tasks always have a `name` including information about the service
         itself. If you need to retrieve the final name of the task you can always do so
@@ -354,24 +312,9 @@ class ServiceBase(Service, abc.ABC):
         """
         if not name:
             name = hex(id(coro))[2:]
-        task = self._task_creator.create_task(
-            coro, name=f"{self}:{name}", context=context
+        return self._task_group.create_task(
+            coro, name=f"{self}:{name}", context=context, log_exception=log_exception
         )
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
-
-        if log_exception:
-
-            def _log_exception(task: asyncio.Task[TaskReturnT]) -> None:
-                try:
-                    task.result()
-                except asyncio.CancelledError:
-                    pass
-                except BaseException:  # pylint: disable=broad-except
-                    _logger.exception("%s: Task %r raised an exception", self, task)
-
-            task.add_done_callback(_log_exception)
-        return task
 
     @override
     def cancel(self, msg: str | None = None) -> None:
@@ -380,8 +323,9 @@ class ServiceBase(Service, abc.ABC):
         Args:
             msg: The message to be passed to the tasks being cancelled.
         """
-        for task in self._tasks:
-            task.cancel(msg)
+        if self._main_task is not None:
+            self._main_task.cancel(msg)
+        self._task_group.cancel(msg)
 
     @override
     async def stop(self, msg: str | None = None) -> None:
@@ -397,8 +341,6 @@ class ServiceBase(Service, abc.ABC):
             BaseExceptionGroup: If any of the tasks spawned by this service raised an
                 exception.
         """
-        if not self._tasks:
-            return
         self.cancel(msg)
         try:
             await self
@@ -429,7 +371,7 @@ class ServiceBase(Service, abc.ABC):
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
+    ) -> bool | None:
         """Exit an async context.
 
         Stop this service.
@@ -438,8 +380,12 @@ class ServiceBase(Service, abc.ABC):
             exc_type: The type of the exception raised, if any.
             exc_val: The exception raised, if any.
             exc_tb: The traceback of the exception raised, if any.
+
+        Returns:
+            Whether the exception was handled.
         """
         await self.stop()
+        return None
 
     async def _wait(self) -> None:
         """Wait for this service to finish.
@@ -451,28 +397,21 @@ class ServiceBase(Service, abc.ABC):
                 exception (`CancelError` is not considered an error and not returned in
                 the exception group).
         """
-        # We need to account for tasks that were created between when we started
-        # awaiting and we finished awaiting.
-        while self._tasks:
-            done, pending = await asyncio.wait(self._tasks)
-            assert not pending
+        exceptions: list[BaseException] = []
 
-            # We remove the done tasks, but there might be new ones created after we
-            # started waiting.
-            self._tasks = self._tasks - done
+        if self._main_task is not None:
+            try:
+                await self._main_task
+            except BaseException as error:  # pylint: disable=broad-except
+                exceptions.append(error)
 
-            exceptions: list[BaseException] = []
-            for task in done:
-                try:
-                    # This will raise a CancelledError if the task was cancelled or any
-                    # other exception if the task raised one.
-                    _ = task.result()
-                except BaseException as error:  # pylint: disable=broad-except
-                    exceptions.append(error)
-            if exceptions:
-                raise BaseExceptionGroup(
-                    f"Error while stopping service {self}", exceptions
-                )
+        try:
+            await self._task_group
+        except BaseExceptionGroup as exc_group:
+            exceptions.append(exc_group)
+
+        if exceptions:
+            raise BaseExceptionGroup(f"Error while stopping {self}", exceptions)
 
     @override
     def __await__(self) -> collections.abc.Generator[None, None, None]:
@@ -490,7 +429,7 @@ class ServiceBase(Service, abc.ABC):
 
         Cancel all running tasks spawned by this service.
         """
-        self.cancel("{self!r} was deleted")
+        self.cancel(f"{self!r} was deleted")
 
     def __repr__(self) -> str:
         """Return a string representation of this instance.
@@ -498,7 +437,13 @@ class ServiceBase(Service, abc.ABC):
         Returns:
             A string representation of this instance.
         """
-        return f"{type(self).__name__}(unique_id={self._unique_id!r}, tasks={self._tasks!r})"
+        details = "main"
+        if not self.is_running:
+            details += " not"
+        details += " running"
+        if self._task_group.is_running:
+            details += f", {len(self._task_group.tasks)} extra tasks"
+        return f"{type(self).__name__}<{self._unique_id} {details}>"
 
     def __str__(self) -> str:
         """Return a string representation of this instance.
@@ -506,4 +451,4 @@ class ServiceBase(Service, abc.ABC):
         Returns:
             A string representation of this instance.
         """
-        return f"{type(self).__name__}[{self._unique_id}]"
+        return f"{type(self).__name__}:{self._unique_id}"

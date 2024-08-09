@@ -1,15 +1,16 @@
 # License: MIT
 # Copyright © 2022 Frequenz Energy-as-a-Service GmbH
 
-"""Tests for the asyncio module."""
+"""Tests for the asyncio service module."""
 
 import asyncio
 from typing import Literal, assert_never
 
 import async_solipsism
 import pytest
+from typing_extensions import override
 
-from frequenz.core.asyncio import ServiceBase, TaskCreator
+from frequenz.core.asyncio import ServiceBase
 
 
 # This method replaces the event loop for all tests in the file.
@@ -34,28 +35,24 @@ class FakeService(ServiceBase):
         self._sleep = sleep
         self._exc = exc
 
-    def start(self) -> None:
-        """Start this service."""
-
-        async def nop() -> None:
-            if self._sleep is not None:
-                await asyncio.sleep(self._sleep)
-            if self._exc is not None:
-                raise self._exc
-
-        self._tasks.add(asyncio.create_task(nop(), name="nop"))
+    @override
+    async def main(self) -> None:
+        """Run this service."""
+        if self._sleep is not None:
+            await asyncio.sleep(self._sleep)
+        if self._exc is not None:
+            raise self._exc
 
 
 async def test_construction_defaults() -> None:
     """Test the construction of a service with default arguments."""
     fake_service = FakeService()
     assert fake_service.unique_id == hex(id(fake_service))[2:]
-    assert fake_service.tasks == set()
+    assert fake_service.task_group.tasks == set()
     assert fake_service.is_running is False
-    assert str(fake_service) == f"FakeService[{fake_service.unique_id}]"
+    assert str(fake_service) == f"FakeService:{fake_service.unique_id}"
     assert (
-        repr(fake_service)
-        == f"FakeService(unique_id={fake_service.unique_id!r}, tasks=set())"
+        repr(fake_service) == f"FakeService<{fake_service.unique_id} main not running>"
     )
 
 
@@ -63,7 +60,7 @@ async def test_construction_custom() -> None:
     """Test the construction of a service with a custom unique ID."""
     fake_service = FakeService(unique_id="test")
     assert fake_service.unique_id == "test"
-    assert fake_service.tasks == set()
+    assert fake_service.task_group.tasks == set()
     assert fake_service.is_running is False
 
 
@@ -150,18 +147,3 @@ async def test_async_context_manager() -> None:
         assert fake_service.is_running is True
 
     assert fake_service.is_running is False
-
-
-def test_task_creator_asyncio() -> None:
-    """Test that the asyncio module is a TaskCreator."""
-    assert isinstance(asyncio, TaskCreator)
-
-
-async def test_task_creator_loop() -> None:
-    """Test that the asyncio event loop is a TaskCreator."""
-    assert isinstance(asyncio.get_event_loop(), TaskCreator)
-
-
-def test_task_creator_task_group() -> None:
-    """Test that the asyncio task group is a TaskCreator."""
-    assert isinstance(asyncio.TaskGroup(), TaskCreator)
