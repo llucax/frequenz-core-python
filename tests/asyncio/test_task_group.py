@@ -8,7 +8,7 @@ import asyncio
 import async_solipsism
 import pytest
 
-from frequenz.core.asyncio import PersistentTaskGroup, TaskCreator
+from frequenz.core.asyncio import PersistentTaskGroup
 
 
 # This method replaces the event loop for all tests in the file.
@@ -380,8 +380,3 @@ async def test_async_context_manager_cancelled() -> None:
 
     assert group.is_running is False
     assert task.cancelled()
-
-
-def test_is_task_creator() -> None:
-    """Test that a persistent task group is a TaskCreator."""
-    assert isinstance(PersistentTaskGroup(), TaskCreator)

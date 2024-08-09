@@ -16,18 +16,16 @@ The module provides the following classes and functions:
   background.
 - [ServiceBase][frequenz.core.asyncio.ServiceBase]: A base class for implementing
   services running in the background.
-- [TaskCreator][frequenz.core.asyncio.TaskCreator]: A protocol for creating tasks.
 """
 
 from ._service import Service, ServiceBase
 from ._task_group import PersistentTaskGroup
-from ._util import TaskCreator, TaskReturnT, cancel_and_await
+from ._util import TaskReturnT, cancel_and_await
 
 __all__ = [
     "PersistentTaskGroup",
     "Service",
     "ServiceBase",
-    "TaskCreator",
     "TaskReturnT",
     "cancel_and_await",
 ]

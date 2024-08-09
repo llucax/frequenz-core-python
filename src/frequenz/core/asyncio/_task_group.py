@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator, Coroutine, Generator, Set
 from types import TracebackType
 from typing import Any, Self
 
-from ._util import TaskCreator, TaskReturnT
+from ._util import TaskReturnT
 
 _logger = logging.getLogger(__name__)
 
@@ -83,9 +83,7 @@ class PersistentTaskGroup:
         ```
     """
 
-    def __init__(
-        self, *, unique_id: str | None = None, task_creator: TaskCreator = asyncio
-    ) -> None:
+    def __init__(self, *, unique_id: str | None = None) -> None:
         """Initialize this instance.
 
         Args:
@@ -93,17 +91,11 @@ class PersistentTaskGroup:
                 a string based on `hex(id(self))` will be used. This is used in
                 `__repr__` and `__str__` methods, mainly for debugging purposes, to
                 identify a particular instance of a persistent task group.
-            task_creator: The object that will be used to create tasks. Usually one of:
-                the [`asyncio`]() module, an [`asyncio.AbstractEventLoop`]() or
-                an [`asyncio.TaskGroup`]().
         """
         # [2:] is used to remove the '0x' prefix from the hex representation of the id,
         # as it doesn't add any uniqueness to the string.
         self._unique_id: str = hex(id(self))[2:] if unique_id is None else unique_id
         """The unique ID of this instance."""
-
-        self._task_creator: TaskCreator = task_creator
-        """The object that will be used to create tasks."""
 
         self._running: set[asyncio.Task[Any]] = set()
         """The set of tasks that are still running.
@@ -139,11 +131,6 @@ class PersistentTaskGroup:
             unless the class explicitly documents it is safe to do so.
         """
         return self._running | self._waiting_ack
-
-    @property
-    def task_creator(self) -> TaskCreator:
-        """The object that will be used to create tasks."""
-        return self._task_creator
 
     @property
     def is_running(self) -> bool:
@@ -196,9 +183,7 @@ class PersistentTaskGroup:
         """
         if not name:
             name = hex(id(coro))[2:]
-        task = self._task_creator.create_task(
-            coro, name=f"{self}:{name}", context=context
-        )
+        task = asyncio.create_task(coro, name=f"{self}:{name}", context=context)
         self._running.add(task)
         task.add_done_callback(self._running.discard)
         task.add_done_callback(self._waiting_ack.add)

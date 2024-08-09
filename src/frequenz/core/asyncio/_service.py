@@ -14,7 +14,7 @@ from typing import Any, Self
 from typing_extensions import override
 
 from ._task_group import PersistentTaskGroup
-from ._util import TaskCreator, TaskReturnT
+from ._util import TaskReturnT
 
 
 class Service(abc.ABC):
@@ -218,9 +218,7 @@ class ServiceBase(Service, abc.ABC):
 
     """
 
-    def __init__(
-        self, *, unique_id: str | None = None, task_creator: TaskCreator = asyncio
-    ) -> None:
+    def __init__(self, *, unique_id: str | None = None) -> None:
         """Initialize this Service.
 
         Args:
@@ -228,16 +226,13 @@ class ServiceBase(Service, abc.ABC):
                 If `None`, a string based on `hex(id(self))` will be used. This is
                 used in `__repr__` and `__str__` methods, mainly for debugging
                 purposes, to identify a particular instance of a service.
-            task_creator: The object that will be used to create tasks. Usually one of:
-                the [`asyncio`]() module, an [`asyncio.AbstractEventLoop`]() or
-                an [`asyncio.TaskGroup`]().
         """
         # [2:] is used to remove the '0x' prefix from the hex representation of the id,
         # as it doesn't add any uniqueness to the string.
         self._unique_id: str = hex(id(self))[2:] if unique_id is None else unique_id
         self._main_task: asyncio.Task[None] | None = None
         self._task_group: PersistentTaskGroup = PersistentTaskGroup(
-            unique_id=self._unique_id, task_creator=task_creator
+            unique_id=self._unique_id
         )
 
     @property
@@ -260,9 +255,7 @@ class ServiceBase(Service, abc.ABC):
         """Start this service."""
         if self.is_running:
             return
-        self._main_task = self._task_group.task_creator.create_task(
-            self.main(), name=str(self)
-        )
+        self._main_task = asyncio.create_task(self.main(), name=str(self))
 
     @property
     @override

@@ -5,44 +5,10 @@
 
 
 import asyncio
-import collections.abc
-import contextvars
-from typing import Any, Protocol, TypeVar, runtime_checkable
+from typing import Any, TypeVar
 
 TaskReturnT = TypeVar("TaskReturnT")
 """The type of the return value of a task."""
-
-
-@runtime_checkable
-class TaskCreator(Protocol):
-    """A protocol for creating tasks.
-
-    Built-in asyncio functions and classes implementing this protocol:
-
-    - [`asyncio`][]
-    - [`asyncio.AbstractEventLoop`][] (returned by [`asyncio.get_event_loop`][] for
-      example)
-    - [`asyncio.TaskGroup`][]
-    """
-
-    def create_task(
-        self,
-        coro: collections.abc.Coroutine[Any, Any, TaskReturnT],
-        *,
-        name: str | None = None,
-        context: contextvars.Context | None = None,
-    ) -> asyncio.Task[TaskReturnT]:
-        """Create a task.
-
-        Args:
-            coro: The coroutine to be executed.
-            name: The name of the task.
-            context: The context to be used for the task.
-
-        Returns:
-            The new task.
-        """
-        ...  # pylint: disable=unnecessary-ellipsis
 
 
 async def cancel_and_await(task: asyncio.Task[Any]) -> None:
