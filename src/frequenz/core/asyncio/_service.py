@@ -327,8 +327,10 @@ class ServiceBase(Service, abc.ABC):
             self._main_task.cancel(msg)
         self._task_group.cancel(msg)
 
+    # We need to use noqa here because pydoclint can't figure out that rest is actually
+    # an instance of BaseExceptionGroup.
     @override
-    async def stop(self, msg: str | None = None) -> None:
+    async def stop(self, msg: str | None = None) -> None:  # noqa: DOC503
         """Stop this service.
 
         This method cancels all running tasks spawned by this service and waits for them

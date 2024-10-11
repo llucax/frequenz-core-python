@@ -137,7 +137,9 @@ def disable_init(
 class _NoInitConstructibleMeta(type):
     """A metaclass that disables the __init__ constructor."""
 
-    def __new__(
+    # We need to use noqa here because pydoclint can't figure out that
+    # _get_no_init_constructible_error() returns a TypeError.
+    def __new__(  # noqa: DOC503
         mcs,
         name: str,
         bases: tuple[type, ...],
@@ -173,7 +175,9 @@ class _NoInitConstructibleMeta(type):
         super().__init__(name, bases, namespace)
         cls._no_init_constructible_error = kwargs.get("no_init_constructible_error")
 
-    def __call__(cls, *args: Any, **kwargs: Any) -> NoReturn:
+    # We need to use noqa here because pydoclint can't figure out that
+    # _get_no_init_constructible_error() returns a TypeError.
+    def __call__(cls, *args: Any, **kwargs: Any) -> NoReturn:  # noqa: DOC503
         """Raise an error when the __init__ constructor is called.
 
         Args:

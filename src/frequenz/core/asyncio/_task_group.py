@@ -227,7 +227,9 @@ class PersistentTaskGroup:
         for task in self._running:
             task.cancel(msg)
 
-    async def stop(self, msg: str | None = None) -> None:
+    # We need to use noqa here because pydoclint can't figure out that rest is actually
+    # an instance of BaseExceptionGroup.
+    async def stop(self, msg: str | None = None) -> None:  # noqa: DOC503
         """Stop this task group.
 
         This method cancels all running tasks spawned by this group and waits for them

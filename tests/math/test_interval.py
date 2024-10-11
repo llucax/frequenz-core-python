@@ -64,7 +64,7 @@ def test_invalid_range(start: LessThanComparable, end: LessThanComparable) -> No
         ),
     ],
 )
-def test_contains(  # pylint: disable=too-many-arguments
+def test_contains(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     start: LessThanComparable,
     end: LessThanComparable,
     within: LessThanComparable,
