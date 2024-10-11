@@ -24,6 +24,8 @@ def get_unique_id(unique_id: str | None, instance: Any) -> str:
     Returns:
         A unique identifier for the instance.
     """
+    # [2:] is used to remove the '0x' prefix from the hex representation of the id, as
+    # it doesn't add any uniqueness to the string.
     return hex(id(instance))[2:] if unique_id is None else unique_id
 
 
