@@ -66,12 +66,14 @@ class Sentinel:
 
     _name: str
     _repr: str
+    _bool_value: bool
     _module_name: str
 
     def __new__(
         cls,
         name: str,
         repr: str | None = None,  # pylint: disable=redefined-builtin
+        bool_value: object = True,
         module_name: str | None = None,
     ) -> Self:
         """Create a new sentinel object.
@@ -81,6 +83,7 @@ class Sentinel:
                 shall be assigned.
             repr: The `repr` of the sentinel object. If not provided, "<name>" will be
                 used (with any leading class names removed).
+            bool_value: The boolean value of the sentinel object.
             module_name: The fully-qualified name of the module in which the sentinel is
                 created. If not provided, the module name will be inferred from the call
                 stack.
@@ -90,6 +93,7 @@ class Sentinel:
         """
         name = str(name)
         repr = str(repr) if repr else f'<{name.split(".")[-1]}>'
+        bool_value = bool(bool_value)
         if not module_name:
             parent_frame = _get_parent_frame()
             module_name = (
@@ -109,6 +113,7 @@ class Sentinel:
         sentinel = super().__new__(cls)
         sentinel._name = name
         sentinel._repr = repr
+        sentinel._bool_value = bool_value
         sentinel._module_name = module_name
         with _lock:
             return cast(Self, _registry.setdefault(registry_key, sentinel))
@@ -117,6 +122,10 @@ class Sentinel:
         """Return a string representation of the sentinel object."""
         return self._repr
 
+    def __bool__(self):
+        """Return the boolean value of the sentinel object."""
+        return self._bool_value
+
     def __reduce__(self):
         """Return the sentinel object's representation for pickling and copying."""
         return (
@@ -124,6 +133,7 @@ class Sentinel:
             (
                 self._name,
                 self._repr,
+                self._bool_value,
                 self._module_name,
             ),
         )

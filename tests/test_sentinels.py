@@ -83,7 +83,8 @@ class TestSentinel(unittest.TestCase):
     def test_bool_value(self) -> None:
         """Test that the sentinel object is falsy."""
         self.assertTrue(sent1)
-        self.assertTrue(Sentinel("I_AM_FALSY"))
+        self.assertTrue(Sentinel("I_AM_TRUTHY"))
+        self.assertFalse(Sentinel("I_AM_FALSY", bool_value=False))
 
     def test_automatic_module_name(self) -> None:
         """Test that the module name is inferred from the call stack."""
