@@ -4,6 +4,13 @@
 # Based on:
 # https://github.com/taleinat/python-stdlib-sentinels/blob/9fdf9628d7bf010f0a66c72b717802c715c7d564/sentinels/sentinels.py
 
+"""Create unique sentinel objects.
+
+This module provides a class, [`Sentinel`][frequenz.core.sentinels], which can be used
+to create unique sentinel objects as specified by [`PEP
+661`](https://peps.python.org/pep-0661/).
+"""
+
 
 import sys as _sys
 from threading import Lock as _Lock
@@ -36,15 +43,25 @@ __all__ = ["Sentinel"]
 class Sentinel:
     """Create a unique sentinel object.
 
-    *name* should be the fully-qualified name of the variable to which the
-    return value shall be assigned.
+    Sentinel objects are used to represent special values, such as "no value" or "not
+    computed yet". They are used in place of [`None`][] to avoid ambiguity, since `None`
+    can be a valid value in some cases.
 
-    *repr*, if supplied, will be used for the repr of the sentinel object.
-    If not provided, "<name>" will be used (with any leading class names
-    removed).
+    For more details, please check [`PEP 661`](https://peps.python.org/pep-0661/).
 
-    *module_name*, if supplied, will be used instead of inspecting the call
-    stack to find the name of the module from which
+    Example:
+        ```python
+        from frequenz.core.sentinels import Sentinel
+        from typing import assert_type
+
+        MISSING = Sentinel('MISSING')
+
+        def func(value: int | MISSING) -> None:
+            if value is MISSING:
+                assert_type(value, MISSING)
+            else:
+                assert_type(value, int)
+        ```
     """
 
     _name: str
@@ -57,6 +74,20 @@ class Sentinel:
         repr: str | None = None,  # pylint: disable=redefined-builtin
         module_name: str | None = None,
     ) -> Self:
+        """Create a new sentinel object.
+
+        Args:
+            name: The fully-qualified name of the variable to which the return value
+                shall be assigned.
+            repr: The `repr` of the sentinel object. If not provided, "<name>" will be
+                used (with any leading class names removed).
+            module_name: The fully-qualified name of the module in which the sentinel is
+                created. If not provided, the module name will be inferred from the call
+                stack.
+
+        Returns:
+            A unique sentinel object.
+        """
         name = str(name)
         repr = str(repr) if repr else f'<{name.split(".")[-1]}>'
         if not module_name:
@@ -83,9 +114,11 @@ class Sentinel:
             return cast(Self, _registry.setdefault(registry_key, sentinel))
 
     def __repr__(self):
+        """Return a string representation of the sentinel object."""
         return self._repr
 
     def __reduce__(self):
+        """Return the sentinel object's representation for pickling and copying."""
         return (
             self.__class__,
             (
