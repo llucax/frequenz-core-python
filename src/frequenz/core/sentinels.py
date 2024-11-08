@@ -7,6 +7,7 @@
 
 import sys as _sys
 from threading import Lock as _Lock
+from typing import Self, cast
 
 __all__ = ["Sentinel"]
 
@@ -55,7 +56,7 @@ class Sentinel:
         name: str,
         repr: str | None = None,
         module_name: str | None = None,
-    ):
+    ) -> Self:
         name = str(name)
         repr = str(repr) if repr else f'<{name.split(".")[-1]}>'
         if not module_name:
@@ -73,13 +74,13 @@ class Sentinel:
         )
         sentinel = _registry.get(registry_key, None)
         if sentinel is not None:
-            return sentinel
+            return cast(Self, sentinel)
         sentinel = super().__new__(cls)
         sentinel._name = name
         sentinel._repr = repr
         sentinel._module_name = module_name
         with _lock:
-            return _registry.setdefault(registry_key, sentinel)
+            return cast(Self, _registry.setdefault(registry_key, sentinel))
 
     def __repr__(self):
         return self._repr

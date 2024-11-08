@@ -15,16 +15,16 @@ sent2 = Sentinel("sent2", repr="test_sentinels.sent2")
 
 
 class TestSentinel(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.sent_defined_in_function = Sentinel("defined_in_function")
 
-    def test_identity(self):
+    def test_identity(self) -> None:
         for sent in sent1, sent2, self.sent_defined_in_function:
             with self.subTest(sent=sent):
                 self.assertIs(sent, sent)
                 self.assertEqual(sent, sent)
 
-    def test_uniqueness(self):
+    def test_uniqueness(self) -> None:
         self.assertIsNot(sent1, sent2)
         self.assertNotEqual(sent1, sent2)
         self.assertIsNot(sent1, None)
@@ -36,41 +36,41 @@ class TestSentinel(unittest.TestCase):
         self.assertIsNot(sent1, "<sent1>")
         self.assertNotEqual(sent1, "<sent1>")
 
-    def test_same_object_in_same_module(self):
+    def test_same_object_in_same_module(self) -> None:
         copy1 = Sentinel("sent1")
         self.assertIs(copy1, sent1)
         copy2 = Sentinel("sent1")
         self.assertIs(copy2, copy1)
 
-    def test_same_object_fake_module(self):
+    def test_same_object_fake_module(self) -> None:
         copy1 = Sentinel("FOO", module_name="i.dont.exist")
         copy2 = Sentinel("FOO", module_name="i.dont.exist")
         self.assertIs(copy1, copy2)
 
-    def test_unique_in_different_modules(self):
+    def test_unique_in_different_modules(self) -> None:
         other_module_sent1 = Sentinel("sent1", module_name="i.dont.exist")
         self.assertIsNot(other_module_sent1, sent1)
 
-    def test_repr(self):
+    def test_repr(self) -> None:
         self.assertEqual(repr(sent1), "<sent1>")
         self.assertEqual(repr(sent2), "test_sentinels.sent2")
 
-    def test_type(self):
+    def test_type(self) -> None:
         self.assertIsInstance(sent1, Sentinel)
         self.assertIsInstance(sent2, Sentinel)
 
-    def test_copy(self):
+    def test_copy(self) -> None:
         self.assertIs(sent1, copy.copy(sent1))
         self.assertIs(sent1, copy.deepcopy(sent1))
 
-    def test_pickle_roundtrip(self):
+    def test_pickle_roundtrip(self) -> None:
         self.assertIs(sent1, pickle.loads(pickle.dumps(sent1)))
 
-    def test_bool_value(self):
+    def test_bool_value(self) -> None:
         self.assertTrue(sent1)
         self.assertTrue(Sentinel("I_AM_FALSY"))
 
-    def test_automatic_module_name(self):
+    def test_automatic_module_name(self) -> None:
         self.assertIs(
             Sentinel("sent1", module_name=__name__),
             sent1,
@@ -80,9 +80,9 @@ class TestSentinel(unittest.TestCase):
             self.sent_defined_in_function,
         )
 
-    def test_subclass(self):
+    def test_subclass(self) -> None:
         class FalseySentinel(Sentinel):
-            def __bool__(self):
+            def __bool__(self) -> bool:
                 return False
 
         subclass_sent = FalseySentinel("FOO")
