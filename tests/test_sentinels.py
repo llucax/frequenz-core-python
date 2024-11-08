@@ -1,6 +1,7 @@
 # License: MIT
 # Copyright © 2021-2022 Tal Einat
-# Copied from:
+# Copyright © 2024 Frequenz Energy-as-a-Service GmbH
+# Based on:
 # https://github.com/taleinat/python-stdlib-sentinels/blob/9fdf9628d7bf010f0a66c72b717802c715c7d564/test/test_sentinels.py
 
 from sentinels import Sentinel
@@ -10,13 +11,13 @@ import pickle
 import unittest
 
 
-sent1 = Sentinel('sent1')
-sent2 = Sentinel('sent2', repr='test_sentinels.sent2')
+sent1 = Sentinel("sent1")
+sent2 = Sentinel("sent2", repr="test_sentinels.sent2")
 
 
 class TestSentinel(unittest.TestCase):
     def setUp(self):
-        self.sent_defined_in_function = Sentinel('defined_in_function')
+        self.sent_defined_in_function = Sentinel("defined_in_function")
 
     def test_identity(self):
         for sent in sent1, sent2, self.sent_defined_in_function:
@@ -31,29 +32,29 @@ class TestSentinel(unittest.TestCase):
         self.assertNotEqual(sent1, None)
         self.assertIsNot(sent1, Ellipsis)
         self.assertNotEqual(sent1, Ellipsis)
-        self.assertIsNot(sent1, 'sent1')
-        self.assertNotEqual(sent1, 'sent1')
-        self.assertIsNot(sent1, '<sent1>')
-        self.assertNotEqual(sent1, '<sent1>')
+        self.assertIsNot(sent1, "sent1")
+        self.assertNotEqual(sent1, "sent1")
+        self.assertIsNot(sent1, "<sent1>")
+        self.assertNotEqual(sent1, "<sent1>")
 
     def test_same_object_in_same_module(self):
-        copy1 = Sentinel('sent1')
+        copy1 = Sentinel("sent1")
         self.assertIs(copy1, sent1)
-        copy2 = Sentinel('sent1')
+        copy2 = Sentinel("sent1")
         self.assertIs(copy2, copy1)
 
     def test_same_object_fake_module(self):
-        copy1 = Sentinel('FOO', module_name='i.dont.exist')
-        copy2 = Sentinel('FOO', module_name='i.dont.exist')
+        copy1 = Sentinel("FOO", module_name="i.dont.exist")
+        copy2 = Sentinel("FOO", module_name="i.dont.exist")
         self.assertIs(copy1, copy2)
 
     def test_unique_in_different_modules(self):
-        other_module_sent1 = Sentinel('sent1', module_name='i.dont.exist')
+        other_module_sent1 = Sentinel("sent1", module_name="i.dont.exist")
         self.assertIsNot(other_module_sent1, sent1)
 
     def test_repr(self):
-        self.assertEqual(repr(sent1), '<sent1>')
-        self.assertEqual(repr(sent2), 'test_sentinels.sent2')
+        self.assertEqual(repr(sent1), "<sent1>")
+        self.assertEqual(repr(sent2), "test_sentinels.sent2")
 
     def test_type(self):
         self.assertIsInstance(sent1, Sentinel)
@@ -68,15 +69,15 @@ class TestSentinel(unittest.TestCase):
 
     def test_bool_value(self):
         self.assertTrue(sent1)
-        self.assertTrue(Sentinel('I_AM_FALSY'))
+        self.assertTrue(Sentinel("I_AM_FALSY"))
 
     def test_automatic_module_name(self):
         self.assertIs(
-            Sentinel('sent1', module_name=__name__),
+            Sentinel("sent1", module_name=__name__),
             sent1,
         )
         self.assertIs(
-            Sentinel('defined_in_function', module_name=__name__),
+            Sentinel("defined_in_function", module_name=__name__),
             self.sent_defined_in_function,
         )
 
@@ -84,14 +85,15 @@ class TestSentinel(unittest.TestCase):
         class FalseySentinel(Sentinel):
             def __bool__(self):
                 return False
-        subclass_sent = FalseySentinel('FOO')
+
+        subclass_sent = FalseySentinel("FOO")
         self.assertIs(subclass_sent, subclass_sent)
         self.assertEqual(subclass_sent, subclass_sent)
         self.assertFalse(subclass_sent)
-        non_subclass_sent = Sentinel('FOO')
+        non_subclass_sent = Sentinel("FOO")
         self.assertIsNot(subclass_sent, non_subclass_sent)
         self.assertNotEqual(subclass_sent, non_subclass_sent)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

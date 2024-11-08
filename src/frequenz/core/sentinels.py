@@ -1,13 +1,14 @@
 # License: MIT
 # Copyright © 2021-2022 Tal Einat
-# Copied from:
+# Copyright © 2024 Frequenz Energy-as-a-Service GmbH
+# Based on:
 # https://github.com/taleinat/python-stdlib-sentinels/blob/9fdf9628d7bf010f0a66c72b717802c715c7d564/sentinels/sentinels.py
+
 
 import sys as _sys
 from threading import Lock as _Lock
 
-
-__all__ = ['Sentinel']
+__all__ = ["Sentinel"]
 
 
 # Design and implementation decisions:
@@ -44,6 +45,7 @@ class Sentinel:
     *module_name*, if supplied, will be used instead of inspecting the call
     stack to find the name of the module from which
     """
+
     _name: str
     _repr: str
     _module_name: str
@@ -59,7 +61,7 @@ class Sentinel:
         if not module_name:
             parent_frame = _get_parent_frame()
             module_name = (
-                parent_frame.f_globals.get('__name__', '__main__')
+                parent_frame.f_globals.get("__name__", "__main__")
                 if parent_frame is not None
                 else __name__
             )
@@ -67,7 +69,7 @@ class Sentinel:
         # Include the class's module and fully qualified name in the
         # registry key to support sub-classing.
         registry_key = _sys.intern(
-            f'{cls.__module__}-{cls.__qualname__}-{module_name}-{name}'
+            f"{cls.__module__}-{cls.__qualname__}-{module_name}-{name}"
         )
         sentinel = _registry.get(registry_key, None)
         if sentinel is not None:
@@ -113,6 +115,7 @@ def _get_parent_frame():
         return _sys._getframe(2)
     except (AttributeError, ValueError):
         global _get_parent_frame
+
         def _get_parent_frame():
             """Return the frame object for the caller's parent stack frame."""
             try:
@@ -122,8 +125,11 @@ def _get_parent_frame():
                     return _sys.exc_info()[2].tb_frame.f_back.f_back
                 except Exception:
                     global _get_parent_frame
+
                     def _get_parent_frame():
                         """Return the frame object for the caller's parent stack frame."""
                         return None
+
                     return _get_parent_frame()
+
         return _get_parent_frame()
