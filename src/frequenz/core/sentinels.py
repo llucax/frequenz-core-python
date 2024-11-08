@@ -54,7 +54,7 @@ class Sentinel:
     def __new__(
         cls,
         name: str,
-        repr: str | None = None,
+        repr: str | None = None,  # pylint: disable=redefined-builtin
         module_name: str | None = None,
     ) -> Self:
         name = str(name)
