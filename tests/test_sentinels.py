@@ -4,12 +4,11 @@
 # Based on:
 # https://github.com/taleinat/python-stdlib-sentinels/blob/9fdf9628d7bf010f0a66c72b717802c715c7d564/test/test_sentinels.py
 
-from sentinels import Sentinel
-
 import copy
 import pickle
 import unittest
 
+from frequenz.core.sentinels import Sentinel
 
 sent1 = Sentinel("sent1")
 sent2 = Sentinel("sent2", repr="test_sentinels.sent2")
