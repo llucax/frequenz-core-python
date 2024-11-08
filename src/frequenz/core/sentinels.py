@@ -95,6 +95,12 @@ class Sentinel:
         )
 
 
+# We ignore checks for the rest of the file, as this is an external implementation and
+# we hope this module gets added to the Python standard library eventually.
+# pylint: disable-all
+# mypy: ignore-errors
+# type: ignore
+
 _lock = _Lock()
 _registry: dict[str, Sentinel] = {}
 
