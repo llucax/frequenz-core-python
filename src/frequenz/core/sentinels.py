@@ -14,7 +14,7 @@ to create unique sentinel objects as specified by [`PEP
 
 import sys as _sys
 from threading import Lock as _Lock
-from typing import Self, cast
+from typing import Self, Union, cast
 
 __all__ = ["Sentinel"]
 
@@ -137,6 +137,14 @@ class Sentinel:
                 self._module_name,
             ),
         )
+
+    def __or__(self, other: object) -> object:
+        """Return the sentinel object or another object."""
+        return Union[self, type(other)]
+
+    def __ror__(self, other: object) -> object:
+        """Return the sentinel object or another object."""
+        return Union[self, type(other)]
 
 
 # We ignore checks for the rest of the file, as this is an external implementation and
