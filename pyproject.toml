@@ -5,7 +5,7 @@
 requires = [
   "setuptools == 75.8.0",
   "setuptools_scm[toml] == 8.1.0",
-  "frequenz-repo-config[lib] == 0.11.0",
+  "frequenz-repo-config[lib] == 0.12.3",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -48,7 +48,7 @@ email = "floss@frequenz.com"
 dev-flake8 = [
   "flake8 == 7.1.1",
   "flake8-docstrings == 1.7.0",
-  "flake8-pyproject == 1.2.3",  # For reading the flake8 config from pyproject.toml
+  "flake8-pyproject == 1.2.3", # For reading the flake8 config from pyproject.toml
   "pydoclint == 0.6.0",
   "pydocstyle == 6.3.0",
 ]
@@ -61,9 +61,9 @@ dev-mkdocs = [
   "mkdocs-literate-nav == 0.6.1",
   "mkdocs-macros-plugin == 1.3.7",
   "mkdocs-material == 9.6.1",
-  "mkdocstrings[python] == 0.27.0",
-  "mkdocstrings-python == 1.13.0",
-  "frequenz-repo-config[lib] == 0.11.0",
+  "mkdocstrings[python] == 0.28.0",
+  "mkdocstrings-python == 1.14.6",
+  "frequenz-repo-config[lib] == 0.12.3",
 ]
 dev-mypy = [
   "mypy == 1.14.1",
@@ -71,7 +71,7 @@ dev-mypy = [
   # For checking the noxfile, docs/ script, and tests
   "frequenz-core[dev-mkdocs,dev-noxfile,dev-pytest]",
 ]
-dev-noxfile = ["nox == 2025.2.9", "frequenz-repo-config[lib] == 0.11.0"]
+dev-noxfile = ["nox == 2025.2.9", "frequenz-repo-config[lib] == 0.12.3"]
 dev-pylint = [
   # dev-pytest already defines a dependency to pylint because of the examples
   # For checking the noxfile, docs/ script, and tests
@@ -79,8 +79,8 @@ dev-pylint = [
 ]
 dev-pytest = [
   "pytest == 8.3.4",
-  "pylint == 3.3.4",                                     # We need this to check for the examples
-  "frequenz-repo-config[extra-lint-examples] == 0.11.0",
+  "pylint == 3.3.4", # We need this to check for the examples
+  "frequenz-repo-config[extra-lint-examples] == 0.12.3",
   "pytest-mock == 3.14.0",
   "pytest-asyncio == 0.25.3",
   "async-solipsism == 0.7",
@@ -155,6 +155,7 @@ disable = [
 ]
 
 [tool.pytest.ini_options]
+addopts = "-W=all -Werror -Wdefault::DeprecationWarning -Wdefault::PendingDeprecationWarning -vv"
 testpaths = ["tests", "src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
