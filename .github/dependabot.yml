@@ -35,10 +35,12 @@ updates:
         exclude-patterns:
           - "async-solipsism"
           - "frequenz-repo-config*"
+          - "frequenz-repo-config[*]"
           - "markdown-callouts"
           - "mkdocs-gen-files"
           - "mkdocs-literate-nav"
           - "mkdocstrings*"
+          - "mkdocstrings[*]"
           - "pydoclint"
           - "pytest-asyncio"
       # We group repo-config updates as it uses optional dependencies that are
@@ -47,9 +49,11 @@ updates:
       repo-config:
         patterns:
           - "frequenz-repo-config*"
+          - "frequenz-repo-config[*]"
       mkdocstrings:
         patterns:
           - "mkdocstrings*"
+          - "mkdocstrings[*]"
 
   - package-ecosystem: "github-actions"
     directory: "/"
