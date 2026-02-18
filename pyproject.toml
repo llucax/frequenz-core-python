@@ -78,7 +78,7 @@ dev-pylint = [
   "frequenz-core[dev-mkdocs,dev-noxfile,dev-pytest]",
 ]
 dev-pytest = [
-  "pytest == 8.4.2",
+  "pytest == 9.0.2",
   "pylint == 3.3.8", # We need this to check for the examples
   "frequenz-repo-config[extra-lint-examples] == 0.13.5",
   "pytest-mock == 3.15.1",
