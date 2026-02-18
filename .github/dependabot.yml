@@ -47,10 +47,16 @@ updates:
       # considered different dependencies otherwise, and will create one PR for
       # each if we don't group them.
       repo-config:
+        update-types:
+          - "minor"
+          - "major"
         patterns:
           - "frequenz-repo-config*"
           - "frequenz-repo-config[*]"
       mkdocstrings:
+        update-types:
+          - "minor"
+          - "major"
         patterns:
           - "mkdocstrings*"
           - "mkdocstrings[*]"
