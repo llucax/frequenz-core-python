@@ -406,3 +406,98 @@ def test_concurrent_blocks_do_not_crash(
         for thread in threads:
             thread.join()
     assert not errors
+
+
+def _live_filters() -> list[Any]:
+    """Get the live filters list (not `warnings.filters` in context-aware mode)."""
+    filters = core_warnings._live_filters(warnings)  # pylint: disable=W0212
+    assert filters is not None
+    return filters
+
+
+def test_ignore_fast_path_does_not_bump_the_version(
+    make_module: Callable[[str], ModuleType],
+) -> None:
+    """Test that an `action="ignore"` block leaves the filters version alone."""
+    module = make_module("fast")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("default")
+        module.warn("before")
+        registry = module.__dict__["__warningregistry__"]
+        stamped = registry["version"]
+        with catch_warnings(action="ignore", category=DeprecationWarning) as log:
+            module.warn("ignored", DeprecationWarning)
+            module.warn("inside")
+        assert log is None
+        assert registry["version"] == stamped
+        module.warn("before")
+        module.warn("inside")
+        module.warn("ignored", DeprecationWarning)
+    assert [str(w.message) for w in caught] == ["before", "inside", "ignored"]
+
+
+def test_ignore_fast_path_restores_filters_changed_by_hand(
+    make_module: Callable[[str], ModuleType],
+) -> None:
+    """Test that filters changed inside the block are restored, as in stdlib.
+
+    Also covers `simplefilter()` replacing our own (equal) entry with its own.
+    """
+    module = make_module("fast_manual")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.resetwarnings()
+        warnings.simplefilter("default")
+        before = _live_filters()[:]
+        with catch_warnings(action="ignore", category=DeprecationWarning):
+            warnings.simplefilter("ignore", DeprecationWarning)
+            warnings.simplefilter("always", UserWarning)
+            module.warn()
+            module.warn()
+        assert _live_filters() == before
+        module.warn("dep", DeprecationWarning)
+        module.warn()
+        module.warn()
+    assert [str(w.message) for w in caught] == [
+        "warned in fast_manual",  # "always" inside, twice
+        "warned in fast_manual",
+        "dep",  # ignore restored away
+        "warned in fast_manual",  # "default" restored, so only once
+    ]
+
+
+def test_ignore_fast_path_survives_nested_stdlib_block() -> None:
+    """Test that a nested standard block copying the filters doesn't confuse it."""
+    with warnings.catch_warnings():
+        warnings.resetwarnings()
+        with catch_warnings(action="ignore", category=DeprecationWarning, append=True):
+            with warnings.catch_warnings():
+                warnings.simplefilter("error")
+            assert len(_live_filters()) == 1
+        assert not _live_filters()
+
+
+def test_ignore_fast_path_restores_showwarning_and_rejects_reentry() -> None:
+    """Test the remaining `catch_warnings` semantics of the fast path."""
+    original = warnings.showwarning
+    block = catch_warnings(action="ignore")
+    with block:
+        warnings.showwarning = lambda *args, **kwargs: None
+    assert warnings.showwarning is original
+    with pytest.raises(RuntimeError, match="twice"):
+        with block:
+            pass
+
+
+def test_ignore_fast_path_still_ignores_and_honours_outer_error(
+    make_module: Callable[[str], ModuleType],
+) -> None:
+    """Test filtering inside and outside the fast block."""
+    module = make_module("fast_error")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with catch_warnings(action="ignore", category=UserWarning):
+            module.warn()
+            with pytest.raises(DeprecationWarning):
+                module.warn("still an error", DeprecationWarning)
+        with pytest.raises(UserWarning):
+            module.warn()

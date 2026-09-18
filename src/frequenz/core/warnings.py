@@ -85,6 +85,35 @@ def _registries() -> list[_Registry]:
     return registries
 
 
+def _live_filters(module: Any) -> list[Any] | None:
+    """Return the list of warning filters in effect, the live object.
+
+    Args:
+        module: The `warnings` module in use.
+
+    Returns:
+        The list CPython consults on each warning, honouring context-aware warnings
+            when available, or `None` if it can't be found.
+    """
+    get_filters = getattr(module, "_get_filters", None)
+    filters = get_filters() if get_filters is not None else module.filters
+    return filters if isinstance(filters, list) else None
+
+
+def _mutated(module: Any) -> None:
+    """Bump the internal filters version.
+
+    Args:
+        module: The `warnings` module in use.
+    """
+    mutated = getattr(module, "_filters_mutated", None)
+    if mutated is not None:
+        mutated()
+        return
+    with module.catch_warnings():  # Entering and leaving bumps it.
+        pass
+
+
 def _current_filters(module: Any) -> list[Any]:
     """Return a copy of the warning filters in effect.
 
@@ -94,8 +123,7 @@ def _current_filters(module: Any) -> list[Any]:
     Returns:
         The filters in effect, honouring context-aware warnings when available.
     """
-    get_filters = getattr(module, "_get_filters", None)
-    return list(get_filters() if get_filters is not None else module.filters)
+    return list(_live_filters(module) or [])
 
 
 def _probe_version(module: Any) -> int | None:
@@ -170,7 +198,7 @@ def _stack() -> list["catch_warnings[Any]"]:
     return stack
 
 
-class catch_warnings(  # pylint: disable=invalid-name
+class catch_warnings(  # pylint: disable=invalid-name,too-many-instance-attributes
     warnings.catch_warnings, Generic[_W_co]
 ):
     """A `catch_warnings` block that preserves the warnings deduplication history.
@@ -225,12 +253,18 @@ class catch_warnings(  # pylint: disable=invalid-name
       handled.
 
     Warning: Cost
-        Entering and leaving a block iterates over `sys.modules` (twice per block when
-        the history can be preserved) and copies every warning registry found, which
-        takes tens of microseconds with a couple of hundred modules loaded and scales
-        linearly with them, compared to well under a microsecond for the standard
-        library version. This is fine for occasional use, but it is not free in tight
-        loops.
+        With `action="ignore"` and no `record`, the block doesn't go through the
+        standard library at all: the filter is added to the live filters list and
+        removed on exit, which leaves the internal filters version untouched, so no
+        registry ever becomes stale and there is nothing to restore. This costs about as
+        much as the standard library block.
+
+        Any other use (another `action`, `record=True`, or no `action` at all) must go
+        through the standard library and then repair the registries, which iterates over
+        `sys.modules` twice per block and copies every warning registry found: tens of
+        microseconds with a few hundred modules loaded, linear in their number, compared
+        to well under a microsecond for the standard library version. Fine for
+        occasional use, but not free in tight loops.
 
     Warning: Concurrency
         The restoration is not atomic with respect to other threads emitting warnings or
@@ -272,8 +306,11 @@ class catch_warnings(  # pylint: disable=invalid-name
         3.11 to 3.15, with and without `-X context_aware_warnings`.
     """
 
-    _module: ModuleType
+    _module: Any
     """The `warnings` module in use (set by the base class)."""
+
+    _record: bool
+    """Whether warnings are recorded (set by the base class)."""
 
     @overload
     def __init__(  # noqa: D107  # pylint: disable=too-many-arguments
@@ -342,6 +379,10 @@ class catch_warnings(  # pylint: disable=invalid-name
         self._entry_filters: list[Any] = []
         self._enter_version: int | None = None
         self._harmless_bumps: int = 0
+        self._fast_item: tuple[Any, ...] | None = None
+        self._fast_saved: list[Any] = []
+        self._fast_showwarning: Any = None
+        self._fast_entered: bool = False
 
     def _only_ignores(self) -> bool:
         """Tell whether this block itself only adds `"ignore"` filters.
@@ -356,12 +397,35 @@ class catch_warnings(  # pylint: disable=invalid-name
 
         Returns:
             The list of recorded warnings if `record` is true, `None` otherwise.
+
+        Raises:
+            RuntimeError: If this instance was already entered.
         """
         if not _SUPPORTED:
             log = cast(_W_co, super().__enter__())
             if self._own_filter is not None:
                 self._module.simplefilter(*self._own_filter)
             return log
+
+        if self._own_filter is not None and self._own_filter[0] == "ignore":
+            filters = _live_filters(self._module) if not self._record else None
+            if filters is not None:
+                # Ignoring only removes warnings, so history recorded on either
+                # side of the block is valid on the other: add the filter without
+                # going through the standard library (which would bump the filters
+                # version and invalidate every registry) and take it out on exit.
+                if self._fast_entered:
+                    raise RuntimeError(f"Cannot enter {self!r} twice")
+                self._fast_entered = True
+                _, category, lineno, append = self._own_filter
+                self._fast_item = ("ignore", None, category, None, lineno)
+                self._fast_saved = filters[:]
+                self._fast_showwarning = self._module.showwarning
+                if append:
+                    filters.append(self._fast_item)
+                else:
+                    filters.insert(0, self._fast_item)
+                return cast(_W_co, None)
 
         snapshots = [(registry, registry.copy()) for registry in _registries()]
         self._entry_filters = _current_filters(self._module)
@@ -405,6 +469,10 @@ class catch_warnings(  # pylint: disable=invalid-name
             super().__exit__(exc_type, exc_val, exc_tb)
             return
 
+        if self._fast_item is not None:
+            self._exit_fast()
+            return
+
         stack = _stack()
         if stack and stack[-1] is self:
             stack.pop()
@@ -431,6 +499,26 @@ class catch_warnings(  # pylint: disable=invalid-name
                 stack[-1]._harmless_bumps += final_version - (self._enter_version - 2)
         else:
             self._restore_history(snapshots, final_version)
+
+    def _exit_fast(self) -> None:
+        """Leave a block that only added an `"ignore"` filter to the live list."""
+        item, self._fast_item = self._fast_item, None
+        filters = _live_filters(self._module)
+        if filters is not None:
+            # By identity: somebody may have inserted an equal filter meanwhile.
+            for index, existing in enumerate(filters):
+                if existing is item:
+                    del filters[index]
+                    break
+            if filters != self._fast_saved:
+                # The filters were changed by hand inside the block: restore them
+                # as the standard library would, bumping the version as it does,
+                # since the registries were filled under other filters.
+                filters[:] = self._fast_saved
+                _mutated(self._module)
+        self._fast_saved = []
+        self._module.showwarning = self._fast_showwarning
+        self._fast_showwarning = None
 
     @staticmethod
     def _keep_history(
