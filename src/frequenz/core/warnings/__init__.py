@@ -5,7 +5,9 @@
 
 This module provides [`ignoring_warnings`][.ignoring_warnings], a context manager to
 silence warnings around a piece of code, without the side effect that
-[`warnings.catch_warnings`][] has.
+[`warnings.catch_warnings`][] has, and
+[`ignoring_deprecations`][.ignoring_deprecations] for the common case of a library
+having to touch a symbol it deprecated itself.
 
 The documented way of silencing a warning locally is a
 [`warnings.catch_warnings`][] block, but merely entering and leaving one invalidates
@@ -47,8 +49,9 @@ With [`warnings.catch_warnings`][] in `convert()` the same loop shows the
 `UserWarning` ten times.
 """
 
-from ._ignoring import ignoring_warnings
+from ._ignoring import ignoring_deprecations, ignoring_warnings
 
 __all__ = [
+    "ignoring_deprecations",
     "ignoring_warnings",
 ]

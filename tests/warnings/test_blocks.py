@@ -8,12 +8,12 @@ from typing import Any
 
 import pytest
 
-from frequenz.core.warnings import ignoring_warnings
+from frequenz.core.warnings import ignoring_deprecations, ignoring_warnings
 
 
 @pytest.mark.parametrize(
     "block",
-    [ignoring_warnings],
+    [ignoring_warnings, ignoring_deprecations],
 )
 def test_blocks_are_not_decorators(block: Callable[[], Any]) -> None:
     """Test that none of these can be used as a decorator.
@@ -37,7 +37,7 @@ def test_blocks_are_not_decorators(block: Callable[[], Any]) -> None:
 
 @pytest.mark.parametrize(
     "block",
-    [ignoring_warnings],
+    [ignoring_warnings, ignoring_deprecations],
 )
 def test_blocks_reject_reentry(block: Callable[[], Any]) -> None:
     """Test that entering the same instance again is refused, and reusing it is not.

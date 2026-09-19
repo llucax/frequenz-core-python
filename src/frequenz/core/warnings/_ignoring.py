@@ -269,3 +269,98 @@ class ignoring_warnings(contextlib.AbstractContextManager[None]):
         live = _live_filters()
         if live is not None and live is not filters:
             _remove_filter(live, self._item)
+
+
+def ignoring_deprecations(  # noqa: DOC502
+    *, message: str = "", module: str = ""
+) -> ignoring_warnings:
+    """Ignore the deprecation warnings raised inside the block.
+
+    This is [`ignoring_warnings`][..ignoring_warnings] for the most common case,
+    library code that has to touch a symbol it deprecated itself. The user was
+    already warned by the deprecated symbol they used; warning them again from its
+    internals, about something they can do nothing about, is noise.
+
+    Warning: All limitations of `ignoring_warnings()` apply
+        Read the documentation of [`ignoring_warnings`][..ignoring_warnings],
+        many limitations apply here too, as this is only a thin wrapper around it.
+
+    Tip:
+        Wrap the call that reaches the deprecated symbol, not everything around
+        it. A block that covers more than that also silences deprecations that have
+        nothing to do with the one it was added for.
+
+    Example:
+        ```python
+        import warnings
+
+        from frequenz.core.warnings import ignoring_deprecations
+
+
+        # A type that used to be public and is now deprecated.
+        class Wrapper:
+            def __init__(self, raw: str) -> None:
+                warnings.warn("Wrapper is deprecated", DeprecationWarning, stacklevel=2)
+                self.raw = raw
+
+
+        def from_wire(raw: str) -> Wrapper:
+            # Whatever else this function does, the deprecations raised out there
+            # are the user's business, so they stay outside the block.
+            with ignoring_deprecations():
+                return Wrapper(raw)
+        ```
+
+    Example: Inside a function that is itself deprecated
+        A deprecated function has already warned its caller about this code path, so
+        the deprecations it reaches on the way are noise too. Even there, keep the
+        block around the calls that raise them rather than putting it around the
+        whole body, which this module can't do for you: it is a context manager and
+        refuses to be used as a decorator.
+
+        ```python
+        import warnings
+
+        from typing_extensions import deprecated
+
+        from frequenz.core.warnings import ignoring_deprecations
+
+
+        # A type that used to be public and is now deprecated.
+        class Wrapper:
+            def __init__(self, raw: str) -> None:
+                warnings.warn("Wrapper is deprecated", DeprecationWarning, stacklevel=2)
+                self.raw = raw
+
+
+        async def save(wrapper: Wrapper) -> None:
+            print(f"saving {wrapper.raw}")
+
+
+        @deprecated("Use from_wire() instead")
+        async def parse(raw: str) -> Wrapper:
+            with ignoring_deprecations():
+                wrapper = Wrapper(raw)
+            await save(wrapper)  # Outside: the scope note applies across an await.
+            return wrapper
+        ```
+
+    Args:
+        message: A regular expression the start of the warning message must match,
+            case insensitively. The default matches every deprecation, which is
+            usually right: the way to be precise here is a short block, not a narrow
+            filter. Use it when the call being wrapped can also raise a deprecation
+            that should be heard.
+        module: A regular expression the start of the module name must match. The
+            default matches every module.
+
+    Returns:
+        A context manager that ignores deprecation warnings.
+
+    Raises:
+        TypeError: If any argument has the wrong type.
+        re.error: If `message` or `module` is not a valid regular expression.
+    """
+    return ignoring_warnings(
+        category=DeprecationWarning, message=message, module=module
+    )

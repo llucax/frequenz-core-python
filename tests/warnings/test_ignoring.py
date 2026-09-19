@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from frequenz.core.warnings import _ignoring, ignoring_warnings
+from frequenz.core.warnings import _ignoring, ignoring_deprecations, ignoring_warnings
 
 
 def _run(function: Callable[[], Any], times: int = 10) -> int:
@@ -300,3 +300,41 @@ async def test_ignoring_warnings_is_not_task_local() -> None:
         await task
 
     assert not caught
+
+
+def test_ignoring_deprecations_only_ignores_deprecations() -> None:
+    """Test that the shortcut silences deprecations and nothing else."""
+    with warnings.catch_warnings(record=True, action="always") as caught:
+        with ignoring_deprecations():
+            warnings.warn("gone", DeprecationWarning, stacklevel=1)
+            warnings.warn("kept", UserWarning, stacklevel=1)
+        warnings.warn("also kept", DeprecationWarning, stacklevel=1)
+    assert [str(warning.message) for warning in caught] == ["kept", "also kept"]
+
+
+def test_ignoring_deprecations_preserves_history(
+    make_module: Callable[[str], ModuleType],
+) -> None:
+    """Test that the shortcut doesn't make already shown warnings repeat."""
+    module = make_module("deprecations")
+
+    def step() -> None:
+        module.warn()
+        with ignoring_deprecations():
+            module.warn("internal", DeprecationWarning)
+
+    assert _run(step) == 1
+
+
+def test_ignoring_deprecations_matches_message_and_module() -> None:
+    """Test that the shortcut can narrow down to one deprecation."""
+    with warnings.catch_warnings(record=True, action="always") as caught:
+        with ignoring_deprecations(message="ours"):
+            warnings.warn("ours is deprecated", DeprecationWarning, stacklevel=1)
+            warnings.warn("somebody else's", DeprecationWarning, stacklevel=1)
+        with ignoring_deprecations(module="no_such_module"):
+            warnings.warn("from this module", DeprecationWarning, stacklevel=1)
+    assert [str(warning.message) for warning in caught] == [
+        "somebody else's",
+        "from this module",
+    ]
