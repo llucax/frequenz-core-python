@@ -12,8 +12,10 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 
-def _checked_aliases(module: str, aliases: Mapping[str, str]) -> dict[str, str]:
-    """Check a set of deprecated aliases and take a snapshot of it.
+def _checked_aliases(
+    module: str, aliases: Mapping[str, str]
+) -> dict[str, tuple[str, str]]:
+    """Check a set of deprecated aliases and resolve them.
 
     Everything here is checked when the aliases are declared rather than when one
     of them is reached, which can be a release later and in somebody else's code,
@@ -24,22 +26,37 @@ def _checked_aliases(module: str, aliases: Mapping[str, str]) -> dict[str, str]:
         aliases: The mapping to check.
 
     Returns:
-        A copy of the mapping, so a later change to it can't get past these checks.
+        Each deprecated name mapped to the module its target lives in and the name
+            it has there, so a later change to `aliases` can't get past these
+            checks and the string doesn't have to be taken apart on every lookup.
 
     Raises:
         TypeError: If `module` is not a string, or a name or target is not one.
-        ValueError: If a target is empty.
+        ValueError: If a target is empty, carries more than one `:`, or has
+            nothing after it.
     """
     if not isinstance(module, str):
         raise TypeError(f"module must be a str, got {module!r}")
-    checked = dict(aliases)
-    for name, target in checked.items():
+    checked: dict[str, tuple[str, str]] = {}
+    for name, target in dict(aliases).items():
         if not isinstance(name, str):
             raise TypeError(f"alias names must be str, got {name!r}")
         if not isinstance(target, str):
             raise TypeError(f"the target of {name!r} must be a str, got {target!r}")
-        if not target:
-            raise ValueError(f"the target of {name!r} is empty")
+        target_module, renamed, target_name = target.partition(":")
+        # `partition()` stops at the first colon, so a second one would silently
+        # end up inside the name, and the warning would point at `a.b:c`.
+        if ":" in target_name:
+            raise ValueError(
+                f"the target of {name!r} has more than one ':': {target!r}"
+            )
+        if not target_module:
+            raise ValueError(f"the target of {name!r} names no module: {target!r}")
+        if renamed and not target_name:
+            raise ValueError(
+                f"the target of {name!r} has nothing after the ':': {target!r}"
+            )
+        checked[name] = (target_module, target_name or name)
     return checked
 
 
@@ -81,6 +98,28 @@ def deprecated_aliases(  # noqa: DOC502
         Reaching `Decimal` through this module now emits a `DeprecationWarning`
         saying to use `decimal.Decimal` instead.
 
+    Example: Renaming
+        When the symbol was also renamed on the way out, the new name goes after a
+        colon, as in an entry point:
+
+        ```python
+        from typing import TYPE_CHECKING, TypeAlias
+
+        from frequenz.core.warnings import deprecated_aliases
+
+        if TYPE_CHECKING:
+            from fractions import Fraction as _Fraction
+
+            Rational: TypeAlias = _Fraction
+        else:
+            __getattr__ = deprecated_aliases(
+                __name__,
+                {
+                    "Rational": "fractions:Fraction",
+                },
+            )
+        ```
+
     Warning: Security Warning
         This function imports the target module, so the mapping is as trusted
         as an `import` statement in this module. Write it out as a literal;
@@ -88,18 +127,20 @@ def deprecated_aliases(  # noqa: DOC502
 
     Args:
         module: The fully qualified name of the module defining the aliases.
-        aliases: A mapping of each deprecated name to the fully qualified name of the
-            module that now owns it. It is copied, so changing it afterwards has no
-            effect.
+        aliases: A mapping of each deprecated symbol to where it lives now, as the
+            fully qualified name of the module that owns it, optionally followed by
+            `:` and the name it has there, when it is not the deprecated one. It is
+            copied, so changing it afterwards has no effect.
 
     Returns:
         A function suitable for use as the module's `__getattr__`.
 
     Raises:
         TypeError: If `module` is not a string, or a name or target is not one.
-        ValueError: If a target is empty.
+        ValueError: If a target is empty, carries more than one `:`, or has
+            nothing after it.
     """
-    aliases = _checked_aliases(module, aliases)
+    targets = _checked_aliases(module, aliases)
 
     def module_getattr(name: str) -> Any:
         """Return a deprecated alias, warning about its new location.
@@ -113,14 +154,16 @@ def deprecated_aliases(  # noqa: DOC502
         Raises:
             AttributeError: If the name is not one of the deprecated aliases.
         """
-        target_module = aliases.get(name)
-        if target_module is None:
+        target = targets.get(name)
+        if target is None:
             raise AttributeError(f"module {module!r} has no attribute {name!r}")
+        target_module, target_name = target
         warnings.warn(
-            f"{module}.{name} is deprecated. Use {target_module}.{name} instead.",
+            f"{module}.{name} is deprecated. "
+            f"Use {target_module}.{target_name} instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        return getattr(importlib.import_module(target_module), name)
+        return getattr(importlib.import_module(target_module), target_name)
 
     return module_getattr

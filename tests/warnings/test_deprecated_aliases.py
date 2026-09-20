@@ -52,8 +52,19 @@ def test_deprecated_aliases_rejects_unknown_names() -> None:
         (("old_home_bad", {0: "decimal"}), TypeError),
         (("old_home_bad", {"Decimal": 0}), TypeError),
         (("old_home_bad", {"Decimal": ""}), ValueError),
+        (("old_home_bad", {"Decimal": ":Decimal"}), ValueError),
+        (("old_home_bad", {"Decimal": "decimal:"}), ValueError),
+        (("old_home_bad", {"Decimal": "a:b:c"}), ValueError),
     ],
-    ids=["module", "name", "target-type", "target-empty"],
+    ids=[
+        "module",
+        "name",
+        "target-type",
+        "target-empty",
+        "target-no-module",
+        "target-no-name",
+        "target-two-colons",
+    ],
 )
 def test_deprecated_aliases_rejects_a_bad_table(
     args: tuple[Any, Any], error: type[Exception]
@@ -79,3 +90,20 @@ def test_deprecated_aliases_copies_the_table() -> None:
 
     with pytest.raises(AttributeError):
         _ = module.Fraction
+
+
+def test_deprecated_aliases_follows_renames() -> None:
+    """Test that an alias can point to a symbol with a different name."""
+    module = ModuleType("old_home_renamed")
+    module.__getattr__ = deprecated_aliases(  # type: ignore[method-assign]
+        module.__name__, {"Rational": "fractions:Fraction"}
+    )
+
+    with pytest.warns(
+        DeprecationWarning,
+        match=(
+            "^old_home_renamed.Rational is deprecated. "
+            "Use fractions.Fraction instead.$"
+        ),
+    ):
+        assert module.Rational is fractions.Fraction
