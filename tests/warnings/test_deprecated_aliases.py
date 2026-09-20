@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from frequenz.core.warnings import deprecated_aliases
+from frequenz.core.warnings import _deprecated_aliases, deprecated_aliases
 
 
 def test_deprecated_aliases_warns_and_returns_the_real_object() -> None:
@@ -107,3 +107,54 @@ def test_deprecated_aliases_follows_renames() -> None:
         ),
     ):
         assert module.Rational is fractions.Fraction
+
+
+def test_deprecated_aliases_customises_the_warning() -> None:
+    """Test the message, category and stacklevel overrides."""
+    module = ModuleType("old_home_custom")
+    module.__getattr__ = deprecated_aliases(  # type: ignore[method-assign]
+        module.__name__,
+        {"Decimal": "decimal"},
+        message="{old} moved to {new} in v2",
+        category=FutureWarning,
+        stacklevel=1,
+    )
+
+    with pytest.warns(
+        FutureWarning, match="^old_home_custom.Decimal moved to decimal.Decimal in v2$"
+    ) as caught:
+        assert module.Decimal is decimal.Decimal
+
+    # stacklevel=1, so the warning is attributed to the helper itself.
+    assert caught[0].filename == _deprecated_aliases.__file__
+
+
+@pytest.mark.parametrize(
+    "kwargs, error",
+    [
+        ({"message": None}, TypeError),
+        ({"message": "{old} moved, see {'here': 1}"}, ValueError),
+        ({"message": "{old} moved to {where}"}, ValueError),
+        ({"category": int}, TypeError),
+        ({"stacklevel": "2"}, TypeError),
+        ({"stacklevel": 0}, ValueError),
+    ],
+    ids=[
+        "message-type",
+        "message-stray-brace",
+        "message-unknown-field",
+        "category",
+        "stacklevel-type",
+        "stacklevel-range",
+    ],
+)
+def test_deprecated_aliases_rejects_bad_customisation(
+    kwargs: dict[str, Any], error: type[Exception]
+) -> None:
+    """Test that the overrides are checked when the aliases are declared.
+
+    A template is checked by formatting it once here, since a stray brace would
+    otherwise raise a `KeyError` from inside `warnings.warn()`, at the lookup.
+    """
+    with pytest.raises(error):
+        deprecated_aliases("old_home_bad", {"Decimal": "decimal"}, **kwargs)

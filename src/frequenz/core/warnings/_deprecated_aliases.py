@@ -61,7 +61,12 @@ def _checked_aliases(
 
 
 def deprecated_aliases(  # noqa: DOC502
-    module: str, aliases: Mapping[str, str]
+    module: str,
+    aliases: Mapping[str, str],
+    *,
+    message: str = "{old} is deprecated. Use {new} instead.",
+    category: type[Warning] = DeprecationWarning,
+    stacklevel: int = 2,
 ) -> Callable[[str], Any]:
     """Build a module `__getattr__` that warns about deprecated aliases.
 
@@ -120,6 +125,30 @@ def deprecated_aliases(  # noqa: DOC502
             )
         ```
 
+    Example: Custom deprecation message
+        The message is a template that gets the old and new fully qualified names,
+        so it can carry a version, a link, or anything else the default doesn't
+        say:
+
+        ```python
+        from typing import TYPE_CHECKING, TypeAlias
+
+        from frequenz.core.warnings import deprecated_aliases
+
+        if TYPE_CHECKING:
+            from decimal import Decimal as _Decimal
+
+            Decimal: TypeAlias = _Decimal
+        else:
+            __getattr__ = deprecated_aliases(
+                __name__,
+                {
+                    "Decimal": "decimal",
+                },
+                message="{old} is deprecated since v2, use {new} instead.",
+            )
+        ```
+
     Warning: Security Warning
         This function imports the target module, so the mapping is as trusted
         as an `import` statement in this module. Write it out as a literal;
@@ -131,15 +160,42 @@ def deprecated_aliases(  # noqa: DOC502
             fully qualified name of the module that owns it, optionally followed by
             `:` and the name it has there, when it is not the deprecated one. It is
             copied, so changing it afterwards has no effect.
+        message: The template for the warning message, formatted with `{old}` and
+            `{new}`, the fully qualified names of the alias and of the symbol it
+            resolves to.
+        category: The category of the warning to emit.
+        stacklevel: How far up the stack the warning is reported, counting from the
+            `__getattr__` itself. The default of 2 points at the code reaching for
+            the alias, and only needs raising if something wraps the returned
+            function.
 
     Returns:
         A function suitable for use as the module's `__getattr__`.
 
     Raises:
-        TypeError: If `module` is not a string, or a name or target is not one.
+        TypeError: If an argument has the wrong type, including a name or target
+            that is not a string.
         ValueError: If a target is empty, carries more than one `:`, or has
-            nothing after it.
+            nothing after it, if `message` is not a template taking `{old}` and
+            `{new}`, or if `stacklevel` is smaller than 1.
     """
+    if not isinstance(message, str):
+        raise TypeError(f"message must be a str, got {message!r}")
+    if not (isinstance(category, type) and issubclass(category, Warning)):
+        raise TypeError(f"category must be a Warning subclass, got {category!r}")
+    if not isinstance(stacklevel, int):
+        raise TypeError(f"stacklevel must be an int, got {stacklevel!r}")
+    if stacklevel < 1:
+        raise ValueError(f"stacklevel must be 1 or more, got {stacklevel!r}")
+    try:
+        # Formatting it once here is the only way to find a stray brace, which
+        # would otherwise raise from inside `warnings.warn()` at lookup time.
+        message.format(old="", new="")
+    except (IndexError, KeyError, ValueError) as error:
+        raise ValueError(
+            f"message must be a template taking {{old}} and {{new}}, "
+            f"got {message!r}"
+        ) from error
     targets = _checked_aliases(module, aliases)
 
     def module_getattr(name: str) -> Any:
@@ -159,10 +215,11 @@ def deprecated_aliases(  # noqa: DOC502
             raise AttributeError(f"module {module!r} has no attribute {name!r}")
         target_module, target_name = target
         warnings.warn(
-            f"{module}.{name} is deprecated. "
-            f"Use {target_module}.{target_name} instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            message.format(
+                old=f"{module}.{name}", new=f"{target_module}.{target_name}"
+            ),
+            category,
+            stacklevel=stacklevel,
         )
         return getattr(importlib.import_module(target_module), target_name)
 
