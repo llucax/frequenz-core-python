@@ -9,6 +9,9 @@ silence warnings around a piece of code, without the side effect that
 [`ignoring_deprecations`][.ignoring_deprecations] for the common case of a library
 having to touch a symbol it deprecated itself.
 
+It also provides [`deprecated_aliases`][.deprecated_aliases], to keep the old import
+path of a symbol that moved to another module working, warning whoever uses it.
+
 The documented way of silencing a warning locally is a
 [`warnings.catch_warnings`][] block, but merely entering and leaving one invalidates
 the warnings deduplication history of the whole program, so every warning that was
@@ -49,9 +52,11 @@ With [`warnings.catch_warnings`][] in `convert()` the same loop shows the
 `UserWarning` ten times.
 """
 
+from ._deprecated_aliases import deprecated_aliases
 from ._ignoring import ignoring_deprecations, ignoring_warnings
 
 __all__ = [
+    "deprecated_aliases",
     "ignoring_deprecations",
     "ignoring_warnings",
 ]
