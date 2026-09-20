@@ -19,7 +19,7 @@ library with utilities that are frequently needed across different projects.
 
 The following platforms are officially supported (tested):
 
-- **Python:** 3.11
+- **Python:** 3.11, 3.12, 3.13, 3.14
 - **Operating System:** Ubuntu Linux 24.04
 - **Architectures:** amd64, arm64
 
