@@ -161,7 +161,11 @@ disable = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-W=all -Werror -Wdefault::DeprecationWarning -Wdefault::PendingDeprecationWarning -vv"
+filterwarnings = [
+  "error",
+  "once::DeprecationWarning",
+  "once::PendingDeprecationWarning",
+]
 testpaths = ["tests", "src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
