@@ -45,9 +45,9 @@ LessThanComparableOrNoneT = TypeVar(
 )
 """Type variable for a value that is [`LessThanComparable`][..LessThanComparable] or `None`.
 
-Warning: Deprecated
-    This type variable is deprecated and it will be removed in a future version. Use
-    [`LessThanComparableT`][..LessThanComparableT] instead.
+Deprecated:
+    This type variable is deprecated since v1.4.0 and it will be removed in a
+    future version. Use [`LessThanComparableT`][..LessThanComparableT] instead.
 """
 
 
