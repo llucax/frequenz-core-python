@@ -235,3 +235,27 @@ def test_deprecated_aliases_reach_star_imports() -> None:
         "tests.warnings.documented_aliases.Rational is deprecated. "
         "Use fractions.Fraction instead.",
     }
+
+
+def test_deprecated_aliases_refuses_a_module_target() -> None:
+    """Test that an alias landing on a module is refused instead of served.
+
+    Serving it would half work: `from old import sub` would find it, while
+    `import old.sub` and `from old.sub import X` would still raise
+    `ModuleNotFoundError`, because the import system never asks a package's
+    `__getattr__`. A module that moved needs a real `__init__.py` at the old
+    path.
+    """
+    module = ModuleType("old_home_package")
+    module.__getattr__ = deprecated_aliases(  # type: ignore[method-assign]
+        module.__name__, {"path": "os"}  # os.path is a module
+    )
+
+    with pytest.raises(TypeError, match="^the target of old_home_package.path is"):
+        _ = module.path
+
+    # And the refusal wins over the warning, which would otherwise announce a move
+    # that can't be made.
+    with asserting_no_deprecations():
+        with pytest.raises(TypeError):
+            _ = module.path

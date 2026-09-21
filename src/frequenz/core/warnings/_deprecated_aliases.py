@@ -9,6 +9,7 @@ See the package documentation for the background.
 import importlib
 import warnings
 from collections.abc import Callable, Mapping
+from types import ModuleType
 from typing import Any
 
 
@@ -149,6 +150,12 @@ def deprecated_aliases(  # noqa: DOC502
             )
         ```
 
+    Tip: Deprecating whole modules
+        This function can't be used to deprecate a whole module. If you need to
+        do that, you can keep a real `__init__.py` at the old path, with a
+        `__getattr__ = deprecated_aliases(...)` that includes all the symbols
+        that used to be reachable there.
+
     Warning: Security Warning
         This function imports the target module, so the mapping is as trusted
         as an `import` statement in this module. Write it out as a literal;
@@ -174,7 +181,8 @@ def deprecated_aliases(  # noqa: DOC502
 
     Raises:
         TypeError: If an argument has the wrong type, including a name or target
-            that is not a string.
+            that is not a string. Also later, when an alias is reached, if it
+            resolves to a module rather than to a symbol in one.
         ValueError: If a target is empty, carries more than one `:`, or has
             nothing after it, if `message` is not a template taking `{old}` and
             `{new}`, or if `stacklevel` is smaller than 1.
@@ -209,11 +217,27 @@ def deprecated_aliases(  # noqa: DOC502
 
         Raises:
             AttributeError: If the name is not one of the deprecated aliases.
+            TypeError: If the alias resolves to a module, which this can't keep
+                reachable from its old path.
         """
         target = targets.get(name)
         if target is None:
             raise AttributeError(f"module {module!r} has no attribute {name!r}")
         target_module, target_name = target
+        # Resolved before the warning is raised, so an alias that can't work says
+        # so instead of warning about a move that didn't happen. It also keeps the
+        # `TypeError` below from being masked by an "error" filter turning that
+        # warning into an exception first.
+        value = getattr(importlib.import_module(target_module), target_name)
+        if isinstance(value, ModuleType):
+            raise TypeError(
+                f"the target of {module}.{name} is the module "
+                f"{target_module}.{target_name}, and this aliases names, not "
+                "modules: the import system never consults a package's "
+                f"__getattr__, so `import {module}.{name}` would fail anyway. "
+                f"Keep a real __init__.py at {module}.{name}, with the aliases "
+                "for the names it used to hold in it."
+            )
         warnings.warn(
             message.format(
                 old=f"{module}.{name}", new=f"{target_module}.{target_name}"
@@ -221,6 +245,6 @@ def deprecated_aliases(  # noqa: DOC502
             category,
             stacklevel=stacklevel,
         )
-        return getattr(importlib.import_module(target_module), target_name)
+        return value
 
     return module_getattr
