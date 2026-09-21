@@ -10,7 +10,12 @@ from typing import Any
 
 import pytest
 
-from frequenz.core.warnings import _deprecated_aliases, deprecated_aliases
+from frequenz.core.warnings import (
+    _deprecated_aliases,
+    asserting_no_deprecations,
+    deprecated_aliases,
+)
+from tests.warnings import documented_aliases
 
 
 def test_deprecated_aliases_warns_and_returns_the_real_object() -> None:
@@ -158,3 +163,75 @@ def test_deprecated_aliases_rejects_bad_customisation(
     """
     with pytest.raises(error):
         deprecated_aliases("old_home_bad", {"Decimal": "decimal"}, **kwargs)
+
+
+def test_deprecated_aliases_in_a_real_module() -> None:
+    """Test the documented shape in a package written the way the docstring says.
+
+    The tests above assign the `__getattr__` onto a `ModuleType` they build
+    themselves, so none of them says anything about the `if TYPE_CHECKING:` and
+    `else:` pattern the documentation tells people to write. This one imports a
+    package written that way, where the `__getattr__` is reached through the
+    import system like a user's would be.
+    """
+    with pytest.warns(
+        DeprecationWarning,
+        match=(
+            "^tests.warnings.documented_aliases.Decimal is deprecated. "
+            "Use decimal.Decimal instead.$"
+        ),
+    ):
+        assert documented_aliases.Decimal is decimal.Decimal
+
+    with pytest.warns(
+        DeprecationWarning,
+        match=(
+            "^tests.warnings.documented_aliases.Rational is deprecated. "
+            "Use fractions.Fraction instead.$"
+        ),
+    ):
+        assert documented_aliases.Rational is fractions.Fraction
+
+    # What the package defines itself is untouched: the `__getattr__` is only
+    # consulted for names the module doesn't have.
+    with asserting_no_deprecations():
+        assert documented_aliases.kept() == "kept"
+
+    with pytest.raises(
+        AttributeError,
+        match="module 'tests.warnings.documented_aliases' has no attribute 'Nope'",
+    ):
+        # The `type: ignore` is the point of the `else:` branch, not a nuisance:
+        # with the `__getattr__` at module level mypy would type this `Any` and
+        # say nothing, here and in every downstream import of a name that never
+        # existed.
+        _ = documented_aliases.Nope  # type: ignore[attr-defined]
+
+
+def test_deprecated_aliases_reach_star_imports() -> None:
+    """Test that the aliases come through a wildcard import, warning as they go.
+
+    `__all__` is the only thing a wildcard import consults, and the names in it
+    that the module doesn't define are looked up one by one, so they go through
+    the `__getattr__` and warn like any other access.
+    """
+    namespace: dict[str, Any] = {}
+
+    with pytest.warns(DeprecationWarning) as caught:
+        # pylint: disable-next=exec-used
+        exec("from tests.warnings.documented_aliases import *", namespace)
+
+    assert documented_aliases.__all__ == ["Decimal", "Rational", "kept"]
+    assert namespace["Decimal"] is decimal.Decimal
+    assert namespace["Rational"] is fractions.Fraction
+    assert namespace["kept"] is documented_aliases.kept
+    # Each name in a package's `__all__` is asked for twice, once by the import
+    # machinery finding out whether it names a submodule and once by the wildcard
+    # import itself, so every alias warns more than once here. Which messages come
+    # out is the part worth asserting; how many times CPython looks them up is not.
+    assert {str(warning.message) for warning in caught} == {
+        "tests.warnings.documented_aliases.Decimal is deprecated. "
+        "Use decimal.Decimal instead.",
+        "tests.warnings.documented_aliases.Rational is deprecated. "
+        "Use fractions.Fraction instead.",
+    }
