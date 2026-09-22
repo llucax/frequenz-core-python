@@ -15,7 +15,12 @@ from typing import Any
 
 import pytest
 
-from frequenz.core.warnings import _asserting, asserting_no_warnings
+from frequenz.core.warnings import (
+    _asserting,
+    asserting_no_deprecations,
+    asserting_no_warnings,
+    ignoring_deprecations,
+)
 
 
 @contextlib.contextmanager
@@ -215,6 +220,19 @@ def test_replay_without_showwarnmsg(monkeypatch: pytest.MonkeyPatch) -> None:
     assert seen == [("leaked", ResourceWarning, "somewhere.py", 42, None, None)]
 
 
+def test_asserting_no_warnings_yields_to_an_inner_ignore() -> None:
+    """Test that a warning the code under test silences for itself doesn't fail.
+
+    `ignoring_warnings` adds its filter in front of the one installed here, so the
+    warning is never recorded. That is the intended reading, but it also means an
+    assertion around code that ignores its own deprecations is about what is left.
+    """
+    with _shown():
+        with asserting_no_deprecations():
+            with ignoring_deprecations():
+                warnings.warn("silenced on purpose", DeprecationWarning, stacklevel=1)
+
+
 def test_asserting_no_warnings_replay_honours_a_custom_showwarning(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -399,3 +417,23 @@ def test_asserting_no_warnings_reentry_keeps_what_was_caught() -> None:
         "passed along",
         "after the block",
     ]
+
+
+def test_asserting_no_deprecations() -> None:
+    """Test the deprecation shortcut."""
+    with _shown():
+        with asserting_no_deprecations():
+            warnings.warn("not a deprecation", UserWarning, stacklevel=1)
+    with pytest.raises(AssertionError, match="gone in v3"):
+        with asserting_no_deprecations():
+            warnings.warn("gone in v3", DeprecationWarning, stacklevel=1)
+
+
+def test_asserting_no_deprecations_matches_the_message() -> None:
+    """Test that the shortcut can reject one deprecation and let others be."""
+    with _shown():
+        with asserting_no_deprecations(message="ours"):
+            warnings.warn("somebody else's", DeprecationWarning, stacklevel=1)
+        with pytest.raises(AssertionError, match="ours is deprecated"):
+            with asserting_no_deprecations(message="ours"):
+                warnings.warn("ours is deprecated", DeprecationWarning, stacklevel=1)

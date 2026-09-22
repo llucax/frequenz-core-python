@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from frequenz.core.warnings import (
+    asserting_no_deprecations,
     asserting_no_warnings,
     ignoring_deprecations,
     ignoring_warnings,
@@ -21,6 +22,7 @@ from frequenz.core.warnings import (
         ignoring_warnings,
         ignoring_deprecations,
         asserting_no_warnings,
+        asserting_no_deprecations,
     ],
 )
 def test_blocks_are_not_decorators(block: Callable[[], Any]) -> None:
@@ -49,6 +51,7 @@ def test_blocks_are_not_decorators(block: Callable[[], Any]) -> None:
         ignoring_warnings,
         ignoring_deprecations,
         asserting_no_warnings,
+        asserting_no_deprecations,
     ],
 )
 def test_blocks_reject_reentry(block: Callable[[], Any]) -> None:

@@ -11,8 +11,9 @@ having to touch a symbol it deprecated itself.
 
 It also provides [`deprecated_aliases`][.deprecated_aliases], to keep the old import
 path of a symbol that moved to another module working, warning whoever uses it, and
-[`asserting_no_warnings`][.asserting_no_warnings], to check in a test that a piece of
-code doesn't warn.
+[`asserting_no_warnings`][.asserting_no_warnings] with its
+[`asserting_no_deprecations`][.asserting_no_deprecations] shortcut, to check in a test
+that a piece of code doesn't warn.
 
 The documented way of silencing a warning locally is a
 [`warnings.catch_warnings`][] block, but merely entering and leaving one invalidates
@@ -54,11 +55,12 @@ With [`warnings.catch_warnings`][] in `convert()` the same loop shows the
 `UserWarning` ten times.
 """
 
-from ._asserting import asserting_no_warnings
+from ._asserting import asserting_no_deprecations, asserting_no_warnings
 from ._deprecated_aliases import deprecated_aliases
 from ._ignoring import ignoring_deprecations, ignoring_warnings
 
 __all__ = [
+    "asserting_no_deprecations",
     "asserting_no_warnings",
     "deprecated_aliases",
     "ignoring_deprecations",

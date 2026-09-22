@@ -94,9 +94,10 @@ class asserting_no_warnings(contextlib.AbstractContextManager[None]):
         the one this block adds. So if the code under test ignores a warning
         itself, that warning is never recorded and can't fail the block. This is
         intended, since the code explicitly asked to ignore it. It does mean
-        that around code using
-        [`ignoring_deprecations`][..ignoring_deprecations] internally, this block
-        only checks the deprecations the code didn't silence, not all of them.
+        that an [`asserting_no_deprecations`][..asserting_no_deprecations] block
+        around code using [`ignoring_deprecations`][..ignoring_deprecations]
+        internally only checks the deprecations the code didn't silence, not all
+        of them.
 
     Warning: Handlers installed inside the block
         While the block is active, it controls how warnings are shown. Handlers
@@ -258,3 +259,51 @@ class asserting_no_warnings(contextlib.AbstractContextManager[None]):
                 for warning in unexpected
             )
             raise AssertionError(f"Unexpected warnings raised:\n{listing}")
+
+
+def asserting_no_deprecations(  # noqa: DOC502
+    *, message: str = ""
+) -> asserting_no_warnings:
+    """Fail if a deprecation warning is raised inside the block.
+
+    This is [`asserting_no_warnings`][..asserting_no_warnings] for the usual case,
+    checking that the replacement for a deprecated symbol doesn't itself go through
+    the deprecated one.
+
+    Warning: All limitations of `asserting_no_warnings()` apply
+        Read the documentation of [`asserting_no_warnings`][..asserting_no_warnings],
+        many limitations apply here too, as this is only a thin wrapper around it.
+
+    Pass `message` when the code under test legitimately deprecates something else,
+    or reaches a third-party deprecation there is nothing to be done about: the block
+    wraps the code being tested, so unlike an
+    [`ignoring_deprecations`][..ignoring_deprecations] block it can't be narrowed by
+    making it shorter.
+
+    Example:
+        ```python
+        import warnings
+
+        from frequenz.core.warnings import asserting_no_deprecations
+
+
+        def convert(value: str) -> int:
+            return int(value)
+
+
+        with asserting_no_deprecations(message="Wrapper is deprecated"):
+            assert convert("1") == 1
+        ```
+
+    Args:
+        message: A regular expression the start of the warning message must match,
+            case insensitively. The default rejects every deprecation.
+
+    Returns:
+        A context manager that fails if a deprecation warning is raised in it.
+
+    Raises:
+        TypeError: If `message` has the wrong type.
+        re.error: If `message` is not a valid regular expression.
+    """
+    return asserting_no_warnings(category=DeprecationWarning, message=message)
