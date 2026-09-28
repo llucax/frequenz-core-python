@@ -3,6 +3,7 @@
 
 """Tests for `deprecated_aliases()`."""
 
+import dataclasses
 import decimal
 import fractions
 from types import ModuleType
@@ -11,11 +12,192 @@ from typing import Any
 import pytest
 
 from frequenz.core.warnings import (
+    DeprecatedAlias,
     _deprecated_aliases,
     asserting_no_deprecations,
     deprecated_aliases,
 )
 from tests.warnings import documented_aliases
+
+_MESSAGE = "{old} is deprecated since v1.2.3. Use {new} instead."
+
+
+def test_deprecated_alias_keeps_what_it_was_given() -> None:
+    """Test that an alias keeps its fields as given, and can't be changed."""
+    alias = DeprecatedAlias(
+        "Rational", new_module="fractions", new_name="Fraction", message=_MESSAGE
+    )
+
+    assert alias.name == "Rational"
+    assert alias.new_module == "fractions"
+    assert alias.new_name == "Fraction"
+    assert alias.since is None
+    assert alias.message == _MESSAGE
+    assert alias == DeprecatedAlias(
+        "Rational", new_module="fractions", new_name="Fraction", message=_MESSAGE
+    )
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        alias.new_name = ""  # type: ignore[misc]
+
+    since = DeprecatedAlias("Decimal", new_module="decimal", since="v1.2.3")
+    assert since.since == "v1.2.3"
+    assert since.message is None
+
+
+def test_deprecated_alias_defaults_the_target() -> None:
+    """Test that a missing `new_name` is `name`, and a missing `new_module` `None`."""
+    moved = DeprecatedAlias("Decimal", new_module="decimal", since="v1.2.3")
+    assert moved.new_module == "decimal"
+    assert moved.new_name == "Decimal"
+    assert moved == DeprecatedAlias(
+        "Decimal", new_module="decimal", new_name="Decimal", since="v1.2.3"
+    )
+
+    renamed = DeprecatedAlias("OldName", new_name="NewName", since="v1.2.3")
+    assert renamed.new_module is None
+    assert renamed.new_name == "NewName"
+
+
+@pytest.mark.parametrize(
+    "args, kwargs",
+    [
+        (("Decimal", "decimal", _MESSAGE), {}),
+        ((), {"name": "Decimal", "new_module": "decimal", "message": _MESSAGE}),
+        (("Decimal", "decimal"), {"since": "v1.2.3"}),
+    ],
+    ids=["all-positional", "name-by-keyword", "new-module-positional"],
+)
+def test_deprecated_alias_signature(
+    args: tuple[Any, ...], kwargs: dict[str, Any]
+) -> None:
+    """Test that the name is positional-only and the rest keyword-only."""
+    with pytest.raises(TypeError):
+        DeprecatedAlias(*args, **kwargs)
+
+
+def test_deprecated_alias_needs_exactly_one_of_since_and_message() -> None:
+    """Test that giving both `since` and `message`, or neither, is refused.
+
+    The `type: ignore` comments are part of the test: mypy reports them as unused,
+    and fails, if the overloads ever accept these calls.
+    """
+    with pytest.raises(TypeError, match="exactly one of since and message, got both"):
+        DeprecatedAlias(  # type: ignore[call-overload]
+            "Decimal", new_module="decimal", since="v1.2.3", message=_MESSAGE
+        )
+    with pytest.raises(
+        TypeError, match="exactly one of since and message, got neither"
+    ):
+        DeprecatedAlias("Decimal", new_module="decimal")  # type: ignore[call-overload]
+
+
+def test_deprecated_alias_needs_a_new_module_or_name() -> None:
+    """Test that an alias saying neither where nor under which name is refused.
+
+    The `type: ignore` comments are part of the test: mypy reports them as unused,
+    and fails, if the overloads ever accept these calls.
+    """
+    with pytest.raises(TypeError, match="needs new_module, new_name or both"):
+        DeprecatedAlias("Decimal", since="v1.2.3")  # type: ignore[call-overload]
+    with pytest.raises(TypeError, match="needs new_module, new_name or both"):
+        DeprecatedAlias(  # type: ignore[call-overload]
+            "Decimal", new_module=None, new_name=None, message=_MESSAGE
+        )
+
+
+@pytest.mark.parametrize(
+    "name, new_module, new_name, message, error",
+    [
+        (0, "decimal", None, _MESSAGE, TypeError),
+        ("", "decimal", None, _MESSAGE, ValueError),
+        ("Dec imal", "decimal", None, _MESSAGE, ValueError),
+        ("Decimal", 0, None, _MESSAGE, TypeError),
+        ("Decimal", "", None, _MESSAGE, ValueError),
+        ("Decimal", "a..b", None, _MESSAGE, ValueError),
+        ("Decimal", "a.b-c", None, _MESSAGE, ValueError),
+        ("Decimal", "decimal", 0, _MESSAGE, TypeError),
+        ("Decimal", "decimal", "", _MESSAGE, ValueError),
+        ("Decimal", "decimal", "decimal.Decimal", _MESSAGE, ValueError),
+        ("Decimal", "decimal", None, 0, TypeError),
+        ("Decimal", "decimal", None, "{old} moved, see {'here': 1}", ValueError),
+        ("Decimal", "decimal", None, "{old} moved to {where}", ValueError),
+        ("Decimal", "decimal", None, "{} moved to {new}", ValueError),
+        ("Decimal", "decimal", None, "{0} moved to {new}", ValueError),
+        ("Decimal", "decimal", None, "{old.missing} moved to {new}", ValueError),
+        ("Decimal", "decimal", None, "{old[0]} moved to {new}", ValueError),
+        ("Decimal", "decimal", None, "{old!r} moved to {new}", ValueError),
+        ("Decimal", "decimal", None, "{old:>20} moved to {new}", ValueError),
+        ("Decimal", "decimal", None, "{old:{new}} moved", ValueError),
+    ],
+    ids=[
+        "name-type",
+        "name-empty",
+        "name-not-identifier",
+        "new-module-type",
+        "new-module-empty",
+        "new-module-empty-part",
+        "new-module-not-identifier",
+        "new-name-type",
+        "new-name-empty",
+        "new-name-dotted",
+        "message-type",
+        "message-stray-brace",
+        "message-unknown-field",
+        "message-auto-numbered-field",
+        "message-numbered-field",
+        "message-attribute",
+        "message-index",
+        "message-conversion",
+        "message-format-spec",
+        "message-nested-field",
+    ],
+)
+def test_deprecated_alias_rejects_bad_arguments(
+    name: Any, new_module: Any, new_name: Any, message: Any, error: type[Exception]
+) -> None:
+    """Test that an alias is checked when it is created.
+
+    Left to the lookup, an alias like this fails wherever it happens to be reached,
+    with an error that says nothing about deprecated aliases: a `ModuleNotFoundError`
+    for a module name with a typo, say, or a `KeyError` from inside
+    `warnings.warn()` for a stray brace in the message.
+    """
+    with pytest.raises(error):
+        DeprecatedAlias(name, new_module=new_module, new_name=new_name, message=message)
+
+
+@pytest.mark.parametrize(
+    "since, error",
+    [(0, TypeError), ("", ValueError), ("  ", ValueError)],
+    ids=["type", "empty", "blank"],
+)
+def test_deprecated_alias_rejects_a_bad_since(
+    since: Any, error: type[Exception]
+) -> None:
+    """Test that `since` is checked when the alias is created, like the rest."""
+    with pytest.raises(error):
+        DeprecatedAlias("Decimal", new_module="decimal", since=since)
+
+
+def test_deprecated_alias_formats_its_message() -> None:
+    """Test the message of an alias with `since` and of one with `message`.
+
+    `since` is inserted as written, braces included, rather than being read as part
+    of a template.
+    """
+    names = {"old": "old_home.Decimal", "new": "decimal.Decimal"}
+
+    since = DeprecatedAlias("Decimal", new_module="decimal", since="v{1}.2")
+    assert since.format_message(**names) == (
+        "old_home.Decimal is deprecated since v{1}.2. Use decimal.Decimal instead."
+    )
+
+    message = DeprecatedAlias(
+        "Decimal", new_module="decimal", message="{old} is gone, use {new} ({{v2}})"
+    )
+    assert message.format_message(**names) == (
+        "old_home.Decimal is gone, use decimal.Decimal ({v2})"
+    )
 
 
 def test_deprecated_aliases_warns_and_returns_the_real_object() -> None:

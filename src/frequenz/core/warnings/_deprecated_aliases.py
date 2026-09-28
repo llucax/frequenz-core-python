@@ -7,10 +7,291 @@ See the package documentation for the background.
 """
 
 import importlib
+import string
 import warnings
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from types import ModuleType
-from typing import Any
+from typing import Any, overload
+
+
+@dataclass(frozen=True, init=False, slots=True)
+class DeprecatedAlias:
+    """A symbol kept reachable from its old name.
+
+    Each one is an entry for [`deprecated_aliases`][..deprecated_aliases], which
+    has the examples.
+
+    The symbol moved to another module, `new_module`, was renamed, `new_name`, or
+    both. Without `new_module` it is still in the module defining the alias, under
+    its new name.
+
+    An alias says either since which version it is deprecated, with `since`, or
+    its whole warning message, with `message`, but not both. `since="v1.2.0"`
+    warns with `<old> is deprecated since v1.2.0. Use <new> instead.`, which is
+    what the deprecations guide suggests, so `message` is only needed to say
+    something else.
+
+    Everything is checked when the alias is created rather than when it is
+    reached.
+    """
+
+    name: str
+    """The deprecated name, in the module defining the alias."""
+
+    new_module: str | None
+    """The fully qualified name of the module the symbol lives in now.
+
+    `None` if it is still in the module defining the alias, under
+    [`new_name`][..new_name].
+    """
+
+    new_name: str
+    """The name the symbol has now, [`name`][..name] if it was not renamed."""
+
+    since: str | None
+    """The version the alias is deprecated since, or `None` if it has a `message`.
+
+    The warning says `<old> is deprecated since <since>. Use <new> instead.`
+    """
+
+    message: str | None
+    """The template for the warning message, or `None` if it has a `since`.
+
+    It is formatted with `{old}` and `{new}`, the fully qualified names of the
+    alias and of the symbol it resolves to, as plain fields, without attributes,
+    indexes, conversions or format specs.
+    """
+
+    # One pair of overloads with `new_module` and one with only `new_name`, so a call
+    # with neither matches none of them.
+    @overload
+    def __init__(  # noqa: D107
+        self,
+        name: str,
+        /,
+        *,
+        new_module: str,
+        new_name: str | None = None,
+        since: str,
+    ) -> None: ...
+
+    @overload
+    def __init__(  # noqa: D107
+        self,
+        name: str,
+        /,
+        *,
+        new_module: str,
+        new_name: str | None = None,
+        message: str,
+    ) -> None: ...
+
+    @overload
+    def __init__(  # noqa: D107
+        self,
+        name: str,
+        /,
+        *,
+        new_module: None = None,
+        new_name: str,
+        since: str,
+    ) -> None: ...
+
+    @overload
+    def __init__(  # noqa: D107
+        self,
+        name: str,
+        /,
+        *,
+        new_module: None = None,
+        new_name: str,
+        message: str,
+    ) -> None: ...
+
+    def __init__(  # noqa: DOC502
+        self,
+        name: str,
+        /,
+        *,
+        new_module: str | None = None,
+        new_name: str | None = None,
+        since: str | None = None,
+        message: str | None = None,
+    ) -> None:
+        """Initialize this instance.
+
+        At least one of `new_module` and `new_name` must be given, and exactly one
+        of `since` and `message`.
+
+        Args:
+            name: The deprecated name, in the module defining the alias.
+            new_module: The fully qualified name of the module the symbol lives in
+                now, if it moved out of the module defining the alias.
+            new_name: The name the symbol has now, if it was renamed.
+            since: The version the alias is deprecated since, such as `"v1.2.0"`.
+                The warning then says `<old> is deprecated since <since>. Use
+                <new> instead.`
+            message: The template for the whole warning message instead, formatted
+                with `{old}` and `{new}`, the fully qualified names of the alias
+                and of the symbol it resolves to, as plain fields, without
+                attributes, indexes, conversions or format specs.
+
+        Raises:
+            TypeError: If an argument is not a string, if neither `new_module` nor
+                `new_name` is given, or if not exactly one of `since` and
+                `message` is.
+            ValueError: If `name`, `new_name` or a part of `new_module` is not an
+                identifier, if `since` is empty, or if `message` is not a template
+                with only plain `{old}` and `{new}` fields.
+        """
+        # The class is frozen, which blocks plain assignment here too.
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "new_module", new_module)
+        object.__setattr__(self, "new_name", name if new_name is None else new_name)
+        object.__setattr__(self, "since", since)
+        object.__setattr__(self, "message", message)
+        self._validate(new_name)
+
+    def format_message(self, *, old: str, new: str) -> str:
+        """Format the warning message for this alias.
+
+        Args:
+            old: The fully qualified name of the alias.
+            new: The fully qualified name of the symbol it resolves to.
+
+        Returns:
+            `<old> is deprecated since <since>. Use <new> instead.` if the alias
+                has a `since`, or its `message` formatted with `old` and `new`.
+        """
+        if self.message is None:
+            return f"{old} is deprecated since {self.since}. Use {new} instead."
+        return self.message.format(old=old, new=new)
+
+    def _validate(self, new_name: str | None) -> None:
+        """Check the fields.
+
+        Args:
+            new_name: The `new_name` given to `__init__()`, before it defaulted to
+                `name`, to tell whether it was given at all.
+
+        Raises:
+            TypeError: If neither `new_module` nor `new_name` is given, or if not
+                exactly one of `since` and `message` is.
+        """
+        if self.new_module is None and new_name is None:
+            raise TypeError(
+                f"the alias {self.name!r} needs new_module, new_name or both, "
+                "got neither"
+            )
+        if (self.since is None) == (self.message is None):
+            raise TypeError(
+                f"the alias {self.name!r} needs exactly one of since and message, "
+                f"got {'both' if self.since is not None else 'neither'}"
+            )
+        self._validate_name()
+        self._validate_new_module()
+        self._validate_new_name()
+        self._validate_since()
+        self._validate_message()
+
+    def _validate_name(self) -> None:
+        """Check that `name` is an identifier.
+
+        Raises:
+            TypeError: If it is not a string.
+            ValueError: If it is not an identifier.
+        """
+        if not isinstance(self.name, str):
+            raise TypeError(f"alias names must be str, got {self.name!r}")
+        if not self.name.isidentifier():
+            raise ValueError(f"alias names must be identifiers, got {self.name!r}")
+
+    def _validate_new_module(self) -> None:
+        """Check that `new_module`, if given, is a module name.
+
+        Raises:
+            TypeError: If it is not a string.
+            ValueError: If one of its dotted parts is not an identifier.
+        """
+        if self.new_module is None:
+            return
+        if not isinstance(self.new_module, str):
+            raise TypeError(
+                f"the new_module of {self.name!r} must be a str, "
+                f"got {self.new_module!r}"
+            )
+        if not all(part.isidentifier() for part in self.new_module.split(".")):
+            raise ValueError(
+                f"the new_module of {self.name!r} is not a module name: "
+                f"{self.new_module!r}"
+            )
+
+    def _validate_new_name(self) -> None:
+        """Check that `new_name` is an identifier.
+
+        Raises:
+            TypeError: If it is not a string.
+            ValueError: If it is not an identifier.
+        """
+        if not isinstance(self.new_name, str):
+            raise TypeError(
+                f"the new_name of {self.name!r} must be a str, got {self.new_name!r}"
+            )
+        if not self.new_name.isidentifier():
+            raise ValueError(
+                f"the new_name of {self.name!r} is not an identifier: "
+                f"{self.new_name!r}"
+            )
+
+    def _validate_since(self) -> None:
+        """Check that `since`, if given, is not empty.
+
+        Raises:
+            TypeError: If it is not a string.
+            ValueError: If it is empty or blank.
+        """
+        if self.since is None:
+            return
+        if not isinstance(self.since, str):
+            raise TypeError(
+                f"the since of {self.name!r} must be a str, got {self.since!r}"
+            )
+        if not self.since.strip():
+            raise ValueError(f"the since of {self.name!r} is empty")
+
+    def _validate_message(self) -> None:
+        """Check that `message`, if given, is a template with plain `{old}` and `{new}`.
+
+        Raises:
+            TypeError: If it is not a string.
+            ValueError: If it has a stray brace, or a replacement field other than a
+                plain `{old}` or `{new}`.
+        """
+        if self.message is None:
+            return
+        if not isinstance(self.message, str):
+            raise TypeError(
+                f"the message of {self.name!r} must be a str, got {self.message!r}"
+            )
+        problem = (
+            f"the message of {self.name!r} must be a template with only plain "
+            f"{{old}} and {{new}} fields, got {self.message!r}"
+        )
+        try:
+            # A stray brace raises here.
+            parsed = list(string.Formatter().parse(self.message))
+        except ValueError as error:
+            raise ValueError(problem) from error
+        # Anything more than a plain field can fail depending on the names it is
+        # formatted with, which are only known when the alias is reached, so
+        # formatting it once here can't tell: `{old.missing}` raises
+        # `AttributeError`, and `{old:{new}}` makes the new name a format spec.
+        if not all(
+            field in (None, "old", "new") and not spec and conversion is None
+            for _, field, spec, conversion in parsed
+        ):
+            raise ValueError(problem)
 
 
 def _checked_aliases(

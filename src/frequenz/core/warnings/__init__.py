@@ -56,10 +56,11 @@ With [`warnings.catch_warnings`][] in `convert()` the same loop shows the
 """
 
 from ._asserting import asserting_no_deprecations, asserting_no_warnings
-from ._deprecated_aliases import deprecated_aliases
+from ._deprecated_aliases import DeprecatedAlias, deprecated_aliases
 from ._ignoring import ignoring_deprecations, ignoring_warnings
 
 __all__ = [
+    "DeprecatedAlias",
     "asserting_no_deprecations",
     "asserting_no_warnings",
     "deprecated_aliases",
