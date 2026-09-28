@@ -8,4 +8,4 @@ A new `frequenz.core.warnings` module with:
 
 - `asserting_no_warnings()`, and its `asserting_no_deprecations()` shortcut, fail when the code in the block raises a matching warning/deprecation, listing each one with the place it came from. They are meant for tests, and are a better tool than an `"error"` filter, which makes `warnings.warn()` raise inside the code under test and so changes the very behaviour the test is checking.
 
-- `deprecated_aliases()` builds a module `__getattr__` that warns when a symbol that moved to another module is reached through its old import path, serving the very same object so `isinstance` keeps working through both paths.
+- `deprecated_aliases()` builds a module `__getattr__` that warns when a symbol that moved to another module, or was renamed, is reached through its old import path, serving the very same object so `isinstance` keeps working through both paths.
