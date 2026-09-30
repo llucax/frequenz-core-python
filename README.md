@@ -8,8 +8,8 @@
 
 Core utilities to complement Python's standard library. This library provides
 essential building blocks for Python applications, including mathematical
-utilities, datetime constants, typing helpers, strongly-typed identifiers, and
-module introspection tools.
+utilities, datetime constants, typing helpers, strongly-typed identifiers,
+module introspection tools, and warning and deprecation helpers.
 
 The `frequenz-core` library is designed to be lightweight, type-safe, and
 follow modern Python best practices. It fills common gaps in the standard
@@ -19,8 +19,8 @@ library with utilities that are frequently needed across different projects.
 
 The following platforms are officially supported (tested):
 
-- **Python:** 3.11
-- **Operating System:** Ubuntu Linux 20.04
+- **Python:** 3.11, 3.12, 3.13, 3.14
+- **Operating System:** Ubuntu Linux 24.04
 - **Architectures:** amd64, arm64
 
 ## Installation
@@ -92,7 +92,7 @@ positive = Interval(0, None)  # [0, ∞]
 assert 1000 in positive  # True
 ```
 
-### `Enum` with deprecated members
+### `Enum` Utilities
 
 Define enums with deprecated members that raise deprecation warnings when
 accessed:
@@ -156,6 +156,77 @@ def describe(value: FloatInt | None) -> str:
 assert describe(1) == "number 1"  # ✅ `case float():` alone would crash here
 assert describe(1.5) == "number 1.5"
 assert describe(None) == "nothing"
+```
+
+### Warnings/Deprecations Utilities
+
+Silence a warning around a call without the side effect
+[`warnings.catch_warnings`](https://docs.python.org/3/library/warnings.html#warnings.catch_warnings)
+has, which is to reset the deduplication history of the whole program, so
+every warning already shown is shown again
+([python/cpython#73858](https://github.com/python/cpython/issues/73858)):
+
+```python
+import warnings
+
+from frequenz.core.warnings import ignoring_deprecations
+
+def legacy_parse(raw: str) -> int:
+    warnings.warn("legacy_parse() is deprecated", DeprecationWarning, stacklevel=2)
+    return int(raw)
+
+def parse(raw: str) -> int:
+    # Only around the call that reaches the deprecated symbol.
+    with ignoring_deprecations():
+        return legacy_parse(raw)
+
+with warnings.catch_warnings(record=True, action="default") as shown:
+    for _ in range(10):
+        warnings.warn("said once", UserWarning)
+        parse("1")
+
+assert len(shown) == 1  # ✅ `catch_warnings()` in `parse()` would show it 10 times
+```
+
+Keep the old import path of a symbol that moved working, serving the very same
+object so `isinstance` keeps working through both paths:
+
+```python
+from typing import TYPE_CHECKING, TypeAlias
+
+from frequenz.core.warnings import deprecated_aliases
+
+if TYPE_CHECKING:
+    # Type checkers can't see the runtime `__getattr__` in the `else` branch.
+    from decimal import Decimal as _Decimal
+    from fractions import Fraction as _Fraction
+
+    Decimal: TypeAlias = _Decimal
+    Rational: TypeAlias = _Fraction
+else:
+    # In the `else`, never at module level: a `__getattr__` mypy can see makes
+    # every name it doesn't know in this module `Any`, typos in downstream
+    # imports included.
+    __getattr__ = deprecated_aliases(
+        __name__,
+        {
+            "Decimal": "decimal",  # decimal.Decimal
+            "Rational": "fractions:Fraction",  # Renamed on the way out
+        },
+    )
+```
+
+And check in a test that a piece of code doesn't warn, without the `"error"`
+filter that would make `warnings.warn()` raise inside the code under test:
+
+```python
+from frequenz.core.warnings import asserting_no_deprecations
+
+def parse(raw: str) -> int:
+    return int(raw)
+
+with asserting_no_deprecations():
+    assert parse("1") == 1
 ```
 
 ### Strongly-Typed IDs
