@@ -10,7 +10,9 @@ silence warnings around a piece of code, without the side effect that
 having to touch a symbol it deprecated itself.
 
 It also provides [`deprecated_aliases`][.deprecated_aliases], to keep the old import
-path of a symbol that moved to another module working, warning whoever uses it, and
+path of a symbol that moved to another module, or was renamed, working, warning
+whoever uses it since which version it is deprecated, as its
+[`DeprecatedAlias`][.DeprecatedAlias] entry says, and
 [`asserting_no_warnings`][.asserting_no_warnings] with its
 [`asserting_no_deprecations`][.asserting_no_deprecations] shortcut, to check in a test
 that a piece of code doesn't warn.

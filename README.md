@@ -194,7 +194,7 @@ object so `isinstance` keeps working through both paths:
 ```python
 from typing import TYPE_CHECKING, TypeAlias
 
-from frequenz.core.warnings import deprecated_aliases
+from frequenz.core.warnings import DeprecatedAlias, deprecated_aliases
 
 if TYPE_CHECKING:
     # Type checkers can't see the runtime `__getattr__` in the `else` branch.
@@ -209,10 +209,13 @@ else:
     # imports included.
     __getattr__ = deprecated_aliases(
         __name__,
-        {
-            "Decimal": "decimal",  # decimal.Decimal
-            "Rational": "fractions:Fraction",  # Renamed on the way out
-        },
+        # Warns "<module>.Decimal is deprecated since v1.2.0. Use
+        # decimal.Decimal instead."
+        DeprecatedAlias("Decimal", new_module="decimal", since="v1.2.0"),
+        # Renamed on the way out
+        DeprecatedAlias(
+            "Rational", new_module="fractions", new_name="Fraction", since="v1.3.0"
+        ),
     )
 ```
 

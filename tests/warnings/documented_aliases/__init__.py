@@ -12,7 +12,7 @@ tests importing from here fail if the documented pattern stops working.
 
 from typing import TYPE_CHECKING, TypeAlias
 
-from frequenz.core.warnings import deprecated_aliases
+from frequenz.core.warnings import DeprecatedAlias, deprecated_aliases
 
 __all__ = ["Decimal", "Rational", "kept"]
 
@@ -26,20 +26,27 @@ if TYPE_CHECKING:
     """A decimal number.
 
     Deprecated:
-        `tests.warnings.documented_aliases.Decimal` is deprecated. Use
-        [decimal.Decimal][] instead.
+        `tests.warnings.documented_aliases.Decimal` is deprecated since v1.2.0.
+        Use [decimal.Decimal][] instead.
     """
 
     Rational: TypeAlias = _Fraction
     """A rational number.
 
     Deprecated:
-        `tests.warnings.documented_aliases.Rational` is deprecated. Use
-        [fractions.Fraction][] instead.
+        `tests.warnings.documented_aliases.Rational` is deprecated since v1.3.0.
+        Use [fractions.Fraction][] instead.
     """
 else:
     __getattr__ = deprecated_aliases(
-        __name__, {"Decimal": "decimal", "Rational": "fractions:Fraction"}
+        __name__,
+        DeprecatedAlias("Decimal", new_module="decimal", since="v1.2.0"),
+        DeprecatedAlias(
+            "Rational",
+            new_module="fractions",
+            new_name="Fraction",
+            message="{old} is deprecated since v1.3.0. Use {new} instead.",
+        ),
     )
 
 
