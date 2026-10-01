@@ -310,9 +310,9 @@ def deprecated_aliases(  # noqa: DOC502
     The alias also stays the very same object, so [`isinstance`][] keeps working
     through both paths.
 
-    Each alias is a [`DeprecatedAlias`][..DeprecatedAlias] saying since which version
-    it is deprecated, so aliases deprecated in different releases each warn with
-    their own, or carrying a message of its own instead.
+    Each [`DeprecatedAlias`][..DeprecatedAlias] says when that alias was deprecated
+    or provides its own message, so aliases deprecated in different releases can
+    emit different warnings.
 
     Danger:
         Follow the usage example structure strictly. In particular never drop
